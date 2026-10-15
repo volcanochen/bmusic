@@ -46,6 +46,7 @@ import com.volcano.bmusic.util.Cache;
 import com.volcano.bmusic.util.CoverLoader;
 import com.volcano.bmusic.util.Downloader;
 import com.volcano.bmusic.util.Notify;
+import com.volcano.bmusic.util.Receivers;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -812,7 +813,7 @@ public class MainActivity extends Activity {
         f.addAction(Downloader.ACT_DL);
         f.addAction(Importer.ACT_ADDED);
         f.addAction(CoverLoader.ACT_COVER);
-        registerReceiver(receiver, f);
+        Receivers.registerLocal(this, receiver, f);
         refreshMini();
     }
 

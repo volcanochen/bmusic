@@ -55,8 +55,9 @@ public final class Importer {
                 } catch (Exception e) {
                     if (fail == null) fail = e.getMessage();
                 }
-                Intent i = new Intent(ACT_ADDED);
-                i.putExtra("n", added.size());
+        Intent i = new Intent(ACT_ADDED);
+        i.setPackage(c.getPackageName());
+        i.putExtra("n", added.size());
                 c.sendBroadcast(i);
                 if (cb != null) {
                     final String f = fail;

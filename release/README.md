@@ -4,12 +4,17 @@
 
 ## 当前版本
 
-- **版本号**：v1.0.0（`versionName 1.0.0` / `versionCode 1`）
+- **版本号**：v1.0.2（`versionName 1.0.2` / `versionCode 3`）
 - **包名**：`com.volcano.bmusic`
 - **最低系统**：Android 7.0（API 24）
 - **目标系统**：Android 14（API 34）
 - **体积**：约 140 KB（零第三方依赖，纯 Android SDK 构建）
 - **APK 文件**：[`bmusic.apk`](bmusic.apk)（本目录内，始终为最新版）
+
+### v1.0.2 更新内容
+- 适配屏幕旋转：竖屏 / 横屏自动切换布局，播放不中断
+- 修复播放页按钮状态与进度条不刷新问题
+- 修复 Android 13+ 动态注册广播导致的崩溃
 
 ## 下载与安装
 

@@ -27,6 +27,7 @@ import com.volcano.bmusic.model.Track;
 import com.volcano.bmusic.player.PlaybackService;
 import com.volcano.bmusic.util.CoverLoader;
 import com.volcano.bmusic.util.Downloader;
+import com.volcano.bmusic.util.Receivers;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,6 +52,17 @@ public class PlayerActivity extends Activity {
     private boolean dragging = false;
     private final Handler handler = new Handler();
     private Track cur;
+
+    // Guaranteed UI refresh: poll the service directly every 500ms so the
+    // play/pause icon and progress bar always track playback, even if a
+    // broadcast is missed.
+    private final Runnable progressPoller = new Runnable() {
+        @Override
+        public void run() {
+            updateProgress();
+            handler.postDelayed(this, 500);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle b) {
@@ -343,6 +355,30 @@ public class PlayerActivity extends Activity {
         });
     }
 
+    private void updateProgress() {
+        PlaybackService svc = PlaybackService.get();
+        if (svc == null) return;
+        boolean playing = svc.isPlaying();
+        btnPlay.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play);
+        int dur = svc.duration();
+        int pos = svc.position();
+        tDur.setText(Track.fmt(dur));
+        tCur.setText(Track.fmt(pos));
+        if (!dragging && dur > 0) {
+            seek.setProgress((int) ((long) pos * 1000L / dur));
+        }
+        if (cur != null) {
+            if (svc.isLoading()) {
+                hint.setText("缓冲中...");
+            } else {
+                int m = svc.mode();
+                String mode = m == PlaybackService.MODE_SINGLE ? "单曲循环"
+                        : (m == PlaybackService.MODE_SHUFFLE ? "随机播放" : "列表循环");
+                hint.setText((cur.hasLocal() ? "已缓存 · " : "在线播放 · ") + mode);
+            }
+        }
+    }
+
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context c, Intent i) {
@@ -384,7 +420,7 @@ public class PlayerActivity extends Activity {
         f.addAction(PlaybackService.ACT_STATE);
         f.addAction(PlaybackService.ACT_PROGRESS);
         f.addAction(Downloader.ACT_DL);
-        registerReceiver(receiver, f);
+        Receivers.registerLocal(this, receiver, f);
         refresh();
     }
 
@@ -394,6 +430,7 @@ public class PlayerActivity extends Activity {
             unregisterReceiver(receiver);
         } catch (Exception ignored) {
         }
+        handler.removeCallbacks(progressPoller);
         super.onStop();
     }
 
@@ -406,5 +443,7 @@ public class PlayerActivity extends Activity {
                 refresh();
             }
         }, 200);
+        handler.removeCallbacks(progressPoller);
+        handler.postDelayed(progressPoller, 300);
     }
 }

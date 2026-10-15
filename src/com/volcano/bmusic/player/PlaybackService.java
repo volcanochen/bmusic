@@ -33,6 +33,7 @@ import com.volcano.bmusic.ui.MainActivity;
 import com.volcano.bmusic.util.CoverLoader;
 import com.volcano.bmusic.util.Downloader;
 import com.volcano.bmusic.util.Notify;
+import com.volcano.bmusic.util.Receivers;
 
 import java.util.ArrayList;
 import java.util.Map;
@@ -98,7 +99,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         Notify.ensureChannel(this);
         initPlayer();
         initSession();
-        registerReceiver(noisy, new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY));
+        Receivers.registerLocal(this, noisy, new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY));
         startForegroundSafe();
         restore();
     }
@@ -690,6 +691,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
 
     private void broadcastProgress() {
         Intent i = new Intent(ACT_PROGRESS);
+        i.setPackage(getPackageName());
         i.putExtra("playing", playing);
         i.putExtra("pos", position());
         i.putExtra("dur", duration());
@@ -698,6 +700,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
 
     private void broadcastState() {
         Intent i = new Intent(ACT_STATE);
+        i.setPackage(getPackageName());
         i.putExtra("playing", playing);
         i.putExtra("loading", loading);
         i.putExtra("mode", mode);
@@ -716,6 +719,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
 
     private void broadcastError(String msg) {
         Intent i = new Intent(ACT_STATE);
+        i.setPackage(getPackageName());
         i.putExtra("playing", false);
         i.putExtra("loading", false);
         i.putExtra("error", msg == null ? "未知错误" : msg);
