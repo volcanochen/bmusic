@@ -42,19 +42,17 @@ public class PlaylistActivity extends Activity {
         nameView.setText(getIntent().getStringExtra("name"));
         adapter = new TrackAdapter(this, new TrackAdapter.Listener() {
             @Override
+            public void onPlay(List<Track> list, int pos) {
+                ArrayList<String> ids = new ArrayList<String>();
+                for (Track t : data) ids.add(t.id);
+                PlaybackService.setQueue(PlaylistActivity.this, pid, ids, data.get(pos).id);
+            }
+            @Override
             public void onMore(View anchor, Track t) {
                 menu(t);
             }
         });
         list.setAdapter(adapter);
-        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
-                ArrayList<String> ids = new ArrayList<String>();
-                for (Track t : data) ids.add(t.id);
-                PlaybackService.setQueue(PlaylistActivity.this, pid, ids, data.get(pos).id);
-            }
-        });
         findViewById(R.id.back).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

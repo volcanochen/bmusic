@@ -59,11 +59,12 @@ public class ShareActivity extends Activity {
                                 }
                                 if (choice == 2) {
                                     PlaybackService.append(ShareActivity.this, added.get(0).id);
-                                } else {
+                                } else if (choice == 0) {
                                     PlaybackService.setQueue(ShareActivity.this, -1, ids, added.get(0).id);
                                 }
                                 Toast.makeText(ShareActivity.this,
-                                        added.size() > 1 ? ("已添加 " + added.size() + " 首") : "已添加",
+                                        added.size() > 1 ? ("已添加 " + added.size() + " 首到曲库")
+                                                : (choice == 0 ? "开始播放" : "已添加到曲库"),
                                         Toast.LENGTH_SHORT).show();
                                 finish();
                             }

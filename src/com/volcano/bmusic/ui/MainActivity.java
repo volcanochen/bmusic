@@ -178,17 +178,15 @@ public class MainActivity extends Activity {
     private void initLists() {
         trackAdapter = new TrackAdapter(this, new TrackAdapter.Listener() {
             @Override
+            public void onPlay(List<Track> list, int pos) {
+                playFrom(list, pos, -1);
+            }
+            @Override
             public void onMore(View anchor, Track t) {
                 showTrackMenu(anchor, t);
             }
         });
         listTracks.setAdapter(trackAdapter);
-        listTracks.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
-                playFrom(trackAdapter.data(), pos, -1);
-            }
-        });
         listTracks.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
             @Override
             public boolean onItemLongClick(AdapterView<?> p, View v, int pos, long id) {
@@ -199,17 +197,15 @@ public class MainActivity extends Activity {
 
         recentAdapter = new TrackAdapter(this, new TrackAdapter.Listener() {
             @Override
+            public void onPlay(List<Track> list, int pos) {
+                playFrom(list, pos, -1);
+            }
+            @Override
             public void onMore(View anchor, Track t) {
                 showTrackMenu(anchor, t);
             }
         });
         listRecent.setAdapter(recentAdapter);
-        listRecent.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
-                playFrom(recentAdapter.data(), pos, -1);
-            }
-        });
         listRecent.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
             @Override
             public boolean onItemLongClick(AdapterView<?> p, View v, int pos, long id) {

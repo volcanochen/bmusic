@@ -76,6 +76,8 @@
         android:layout_height="44dp"
         android:background="@null"
         android:contentDescription="更多"
+        android:focusable="false"
+        android:focusableInTouchMode="false"
         android:src="@drawable/ic_more"
         android:tint="@color/text_dim" />
 </LinearLayout>

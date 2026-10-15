@@ -25,6 +25,7 @@ import android.os.PowerManager;
 import android.util.Log;
 
 import com.volcano.bmusic.App;
+import com.volcano.bmusic.R;
 import com.volcano.bmusic.api.Bili;
 import com.volcano.bmusic.db.Db;
 import com.volcano.bmusic.model.Track;
@@ -616,14 +617,14 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         if (!App.autoCacheNext() || queueIds.isEmpty()) return;
         if (mode == MODE_SINGLE) return;
         int n = index + 1;
-        if (n >= queueIds.size()) n = 0;
-        if (n == index) return;
-        if (!App.wifiOnly()) {
-            final Track nt = Db.get(this).get(queueIds.get(n));
-            if (nt != null) Downloader.start(this, nt);
-        } else {
-            Downloader.start(this, Db.get(this).get(queueIds.get(n)));
+        if (n >= queueIds.size()) {
+            if (mode == MODE_SHUFFLE) return;
+            n = 0;
         }
+        if (n == index) return;
+        final Track nt = Db.get(this).get(queueIds.get(n));
+        if (nt == null || nt.hasLocal()) return;
+        Downloader.start(this, nt);
     }
 
     // ------------------------------------------------------------- getters
@@ -760,7 +761,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         } else {
             nb = new Notification.Builder(this);
         }
-        nb.setSmallIcon(android.R.drawable.stat_notify_chat);
+        nb.setSmallIcon(R.drawable.ic_notify);
         nb.setContentTitle(title);
         nb.setContentText(sub);
         nb.setSubText(playing ? "正在播放" : (loading ? "缓冲中" : "已暂停"));
@@ -776,11 +777,10 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         del.setAction(A_STOP);
         nb.setDeleteIntent(PendingIntent.getService(this, 4, del, piFlags()));
 
-        nb.addAction(android.R.drawable.ic_media_previous, "上一首", pi(A_PREV, 1));
-        int playIcon = android.R.drawable.ic_media_play;
-        if (playing) playIcon = android.R.drawable.ic_media_pause;
+        nb.addAction(R.drawable.ic_prev, "上一首", pi(A_PREV, 1));
+        int playIcon = playing ? R.drawable.ic_pause : R.drawable.ic_play;
         nb.addAction(playIcon, playing ? "暂停" : "播放", pi(A_TOGGLE, 2));
-        nb.addAction(android.R.drawable.ic_media_next, "下一首", pi(A_NEXT, 3));
+        nb.addAction(R.drawable.ic_next, "下一首", pi(A_NEXT, 3));
         try {
             Notification.MediaStyle style = new Notification.MediaStyle();
             if (session != null) style.setMediaSession(session.getSessionToken());
@@ -901,6 +901,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
     }
 
     private static void start(Context c, Intent i) {
+        Log.i(TAG, "start command " + i.getAction());
         try {
             if (Build.VERSION.SDK_INT >= 26) {
                 c.startForegroundService(i);
@@ -908,9 +909,11 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
                 c.startService(i);
             }
         } catch (Exception e) {
+            Log.e(TAG, "startForegroundService failed", e);
             try {
                 c.startService(i);
-            } catch (Exception ignored) {
+            } catch (Exception e2) {
+                Log.e(TAG, "startService failed too", e2);
             }
         }
     }

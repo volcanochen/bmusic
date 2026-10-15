@@ -21,6 +21,7 @@ import java.util.Map;
 public class TrackAdapter extends BaseAdapter {
 
     public interface Listener {
+        void onPlay(List<Track> list, int pos);
         void onMore(View anchor, Track t);
     }
 
@@ -126,6 +127,15 @@ public class TrackAdapter extends BaseAdapter {
             h.more.setVisibility(View.GONE);
             h.more.setOnClickListener(null);
         }
+        // Row click: handled here instead of ListView.OnItemClickListener
+        // because a clickable/focusable descendant (the "more" button) would
+        // otherwise suppress the list item click on older devices.
+        v.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (listener != null) listener.onPlay(data, position);
+            }
+        });
         return v;
     }
 
