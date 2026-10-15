@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BMusic</string>
+    <string name="app_sub">B站音频后台播放器</string>
+    <string name="tab_tracks">曲库</string>
+    <string name="tab_playlists">歌单</string>
+    <string name="tab_recent">最近</string>
+    <string name="tab_settings">我的</string>
+    <string name="play">播放</string>
+    <string name="pause">暂停</string>
+    <string name="add">添加</string>
+    <string name="add_link">添加链接</string>
+    <string name="download">缓存</string>
+    <string name="cancel">取消</string>
+    <string name="ok">确定</string>
+    <string name="empty_tracks">还没有曲目\n点击右上角 + 添加B站视频链接</string>
+    <string name="empty_playlists">还没有歌单</string>
+    <string name="empty_recent">还没有播放记录</string>
+    <string name="now_playing">正在播放</string>
+    <string name="default_playlist">我喜欢的音乐</string>
+    <string name="current_queue">播放队列</string>
+    <string name="cached">已缓存</string>
+    <string name="not_cached">未缓存</string>
+    <string name="settings">设置</string>
+    <string name="storage_usage">缓存占用</string>
+    <string name="hint_paste">粘贴B站视频链接 / BV号 / av号，一行一个</string>
+    <string name="added_to_lib">已添加到曲库并开始解析</string>
+    <string name="parse_failed">解析失败</string>
+</resources>

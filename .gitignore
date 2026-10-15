@@ -1,0 +1,17 @@
+# build artifacts
+build/
+*.apk
+*.log
+gen/
+obj/
+
+# signing
+*.keystore
+*.jks
+
+# ide
+.idea/
+*.iml
+.gradle/
+local.properties
+.DS_Store
