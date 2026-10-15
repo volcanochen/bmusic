@@ -15,3 +15,11 @@ obj/
 .gradle/
 local.properties
 .DS_Store
+
+# --- published release artifacts ---
+# The release APK is distributed directly from GitHub (always-latest link).
+!release/
+!release/bmusic.apk
+# Keep the signing key in-repo so builds stay reproducible and updates install
+# cleanly over a previously installed version (same signature).
+!debug.keystore

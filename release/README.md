@@ -1,0 +1,51 @@
+# BMusic 发布包（release）
+
+本目录存放可直接下载安装的 APK 成品，随仓库一起推送，方便从 GitHub 直接获取。
+
+## 当前版本
+
+- **版本号**：v1.0.0（`versionName 1.0.0` / `versionCode 1`）
+- **包名**：`com.volcano.bmusic`
+- **最低系统**：Android 7.0（API 24）
+- **目标系统**：Android 14（API 34）
+- **体积**：约 140 KB（零第三方依赖，纯 Android SDK 构建）
+- **APK 文件**：[`bmusic.apk`](bmusic.apk)（本目录内，始终为最新版）
+
+## 下载与安装
+
+### 方式一：本仓库文件直链（始终最新）
+手机浏览器打开下面任意一个链接，下载后允许「安装未知来源应用」即可安装：
+
+```
+https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk
+```
+
+### 方式二：GitHub Releases 页面（带版本与下载按钮）
+在仓库的 **Releases** 页（或 Tags）找到对应版本，点击 `bmusic-vX.Y.Z.apk` 下载。
+Releases 页面在手机上体验更好，下载按钮更醒目。
+
+> 提示：Android 首次安装未知来源 APK 时，系统会要求授予「允许来自此来源的应用」权限，按提示开启即可。
+
+## 更新说明（重要）
+本 APK 使用本仓库内 `debug.keystore` 签名（已随仓库提交，构建可复现）。
+因此：**后续新版本覆盖安装时无需卸载旧版**，签名一致即可直接升级。
+
+## 功能一览
+- 把 B 站视频当音乐听：分享 / 粘贴链接 → 自动解析并入库
+- 本地缓存，离线优先播放；无缓存时实时从 B 站拉取音频流
+- 后台播放（前台服务）+ 通知栏控制 + 媒体按键 / 耳机拔插控制
+- 曲库 / 最近播放 / 我的 三个视图，支持歌单与播放队列
+- 模糊封面背景、类音乐播放器界面
+
+## 构建（如需自行编译）
+环境：Android SDK（build-tools 34.0.0）、JDK 17（Android Studio 自带）。
+免 Gradle，纯 SDK 工具链：
+
+```bash
+cd bmusic
+bash build.sh                 # 产物在 build/bmusic.apk
+cp build/bmusic.apk release/bmusic.apk
+```
+
+## 校验
+安装前可核对 APK 大小（约 139–140 KB）与包名，确保来源为本仓库。
