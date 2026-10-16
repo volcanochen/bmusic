@@ -786,6 +786,9 @@ public class MainActivity extends Activity {
                         TrackActions.addToPlaylist(MainActivity.this, track);
                         break;
                     case 4:
+                        TrackActions.openBili(MainActivity.this, track);
+                        break;
+                    case 5:
                         TrackActions.confirmDelete(MainActivity.this, track, new Runnable() {
                             @Override
                             public void run() {

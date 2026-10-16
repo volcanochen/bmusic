@@ -1,0 +1,142 @@
+# BMusic 需求清单与实现对照（v1.0.0 → v1.0.7）
+
+本文档汇总 BMusic 全部需求点，按主题归类。需求来源分两类：
+
+- **用户**：用户在迭代过程中明确提出的需求
+- **自主**：开发/联调过程中发现的问题、缺陷或体验改进，由 AI 主动提出并实现
+
+每条需求附实现方式简述与涉及的主要代码。版本列表示该需求随哪个版本交付。
+
+---
+
+## 一、分类总览
+
+| 分类 | 主题 | 需求条数 | 主要交付版本 |
+| :-- | :-- | --: | :-- |
+| A | 链接获取与导入 | 4 | v1.0.0 |
+| B | 播放核心 | 6 | v1.0.0 / v1.0.4 |
+| C | 界面与窗口适配 | 7 | v1.0.0 / v1.0.2 / v1.0.5 |
+| D | 播放队列与曲库操作 | 6 | v1.0.6 / v1.0.7 |
+| E | 歌词 | 3 | v1.0.4 / v1.0.6 |
+| F | 音量控制 | 1 | v1.0.4 |
+| G | 离线缓存 | 4 | v1.0.0 / v1.0.3 |
+| H | 缺陷修复与工程加固 | 8 | 随版本持续 |
+
+---
+
+## 二、需求明细与实现对照
+
+### A. 链接获取与导入
+
+| ID | 需求 | 来源 | 版本 | 实现方式 | 主要代码 |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| A1 | B 站 App「分享 → BMusic」一键入库 | 用户 | v1.0.0 | `ShareActivity` 注册 `ACTION_SEND` / `ACTION_VIEW` intent-filter，透明弹窗式呈现，提取链接后可选「立即播放 / 添加 / 下一首播放」 | `ui/ShareActivity`、`AndroidManifest` |
+| A2 | 复制整段分享文案，粘贴导入；自动识别 `BV号 / av号 / b23.tv短链 / 完整链接` | 用户 | v1.0.0 | 正则从任意文本提取多种链接形态；短链先 HEAD 跟随 302 拿真实 BV 号 | `api/Bili.resolve`、`api/Importer` |
+| A3 | 多 P 视频按分 P 精确导入，曲目 id = `bvid_pN` | 用户 | v1.0.0 | 解析 `view` 接口取全部分页，逐页入库；播放时按 page 定位对应 cid | `api/Bili`、`db/Db.upsert` |
+| A4 | 填 Cookie 解锁 192K 高码率 | 用户 | v1.0.0 | 设置页保存 SESSDATA 等，`Http` 全局 CookieManager 带出 | `ui/SettingsActivity`、`net/Http` |
+
+### B. 播放核心
+
+| ID | 需求 | 来源 | 版本 | 实现方式 | 主要代码 |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| B1 | 只取音频流播放（不下载视频） | 用户 | v1.0.0 | wbi 签名调 `x/player/playurl`（fnval=16），取 DASH 音轨，码率优先级 30280 > 30232 > 30216（跳过 30250 杜比） | `api/Wbi`、`api/Bili`、`player/PlaybackService.startSource` |
+| B2 | 后台 / 锁屏 / 息屏不中断 | 用户 | v1.0.0 | 前台服务常驻 + `setWakeMode(PARTIAL_WAKE_LOCK)` | `player/PlaybackService` |
+| B3 | 通知栏 / 耳机线控 / 蓝牙控制 | 用户 | v1.0.0 | `MediaSession` + `MediaStyle` 通知（上一首/暂停/下一首），注册媒体按键与 `AUDIO_BECOMING_NOISY` | `player/PlaybackService.initSession`、`util/Notify` |
+| B4 | 三种播放模式：列表循环 / 单曲循环 / 随机 | 用户 | v1.0.0 | `next()` 按 mode 分支；模式持久化到 SharedPreferences | `player/PlaybackService.next` |
+| B5 | 播放页完整体验：进度拖拽、模糊封面背景、分 P 徽标 | 用户 | v1.0.0 | `MediaPlayer` 进度轮询；封面缩 1/8 后纯 Java `fastBlur` 堆栈模糊（不用 RenderScript） | `ui/PlayerActivity`、`util/CoverLoader` |
+| B6 | 应用重启后点播放无反应修复 | 自主 | v1.0.4 | `play()` 检测 `mp==null || !mpReady` 时自动 `startSource` 重新准备再播 | `player/PlaybackService.play` |
+
+### C. 界面与窗口适配
+
+| ID | 需求 | 来源 | 版本 | 实现方式 | 主要代码 |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| C1 | 主界面三页（曲库 / 歌单 / 我的）+ 迷你条常驻 | 用户 | v1.0.0 | 单 Activity `FrameLayout` 叠页 + 自绘底部导航，切换无重建 | `ui/MainActivity` |
+| C2 | 适配屏幕旋转 | 用户 | v1.0.2 | `onConfigurationChanged` 切换布局，播放不中断 | `ui/PlayerActivity` |
+| C3 | 分屏 / 浮窗按分配的窗口比例刷新、内容重排 | 用户 | v1.0.5 | 四 Activity 声明 `resizeableActivity` + 完整 `configChanges`（含 `smallestScreenSize`）不重建；`util/Win` 按 WindowMetrics 度量窗口；宽高比变化时 `setContentView` 换布局并缩放控件；按钮被截断时实测（`getEllipsisCount`）去图标 | `util/Win`、`ui/PlayerActivity.relayoutForWindow`、`applyWindowSize` |
+| C4 | 多窗口下度量必须用窗口尺寸而非屏幕尺寸 | 自主 | v1.0.5 | `getDefaultDisplay()` 在分屏下返回屏幕尺寸，改用 API30+ `getCurrentWindowMetrics()`，低版本回退 `Configuration.screenWidthDp/HeightDp` | `util/Win` |
+| C5 | 迷你条显示播放状态并提醒播放事件（缓冲中/播放中/已暂停 + 进度线），标题切换动画过渡 | 用户 | v1.0.6 | 状态驱动文案与图标；进度线随下载/播放进度填充；标题/副标题淡入淡出+位移（`animateText`），播放键脉冲缩放 | `ui/MainActivity.refreshMini` |
+| C6 | 播放页「播放队列」按钮移到底部方便点击 | 用户 | v1.0.6 | 从顶部标题栏移到播放页底部操作区 | `res/layout/activity_player*.xml` |
+| C7 | 播放页底部「返回 B 站」按钮 | 用户 | v1.0.7 | 与「播放队列」并排（各占 50%），点击 `ACTION_VIEW` 跳转 B 站 | `ui/PlayerActivity`、`res/drawable/ic_bili` |
+
+### D. 播放队列与曲库操作
+
+| ID | 需求 | 来源 | 版本 | 实现方式 | 主要代码 |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| D1 | 曲库点击不自动播放（点击=加入队列） | 用户 | v1.0.3 | 行点击改调 `PlaybackService.append`；播放为显式动作（⋮ 菜单「立即播放」） | `ui/MainActivity`、`ui/adapter/TrackAdapter` |
+| D2 | 播放列表独立成页，按曲库样式设计，标记正在播放，提供同类操作 | 用户 | v1.0.6 | 新建 `QueueActivity` 复用 `item_track` 行与 `TrackAdapter`；当前曲目 ▶ 高亮；菜单=立即播放/上移/下移/缓存/加入歌单/返回B站/移除/删除 | `ui/QueueActivity`、`res/layout/activity_queue.xml` |
+| D3 | 「立即播放」= 加入当前播放列表并立即播放 | 用户 | v1.0.6 | `insertAndPlay`：不在队列则插到当前曲之后，随即 `openIndex` 播放；已在队列直接切换 | `player/PlaybackService`（A_PLAY_NOW） |
+| D4 | 曲库「播放 N 首」：当前筛选范围全部导入播放列表并播放 | 用户 | v1.0.6 | `replaceQueue`（A_QUEUE_KEEP）：整体替换队列内容但保留正在播放的曲目不打断；当前曲在筛选结果内则继续播，否则从第一首播 | `ui/MainActivity.playFiltered`、`player/PlaybackService` |
+| D5 | 队列编辑：上移 / 下移 / 移除 | 用户 | v1.0.6 | `editQueue(id, op)`：op=0 移除、∓1 移动；重算 index 保持当前曲不跳变并持久化 | `player/PlaybackService.editQueue` |
+| D6 | 曲目「返回 B 站」：从曲库/歌单/队列跳回 B 站该曲目页面 | 用户 | v1.0.7 | `TrackActions.openBili`：按 `bvid` 组装 `https://www.bilibili.com/video/BVxxx`，多 P 追加 `?p=N`；`ACTION_VIEW` 由系统分发到浏览器或 B 站 App；四个列表菜单与播放页按钮统一接入 | `ui/TrackActions.openBili`、四个 Activity 菜单 |
+
+### E. 歌词
+
+| ID | 需求 | 来源 | 版本 | 实现方式 | 主要代码 |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| E1 | 自动联网找歌词并在播放界面逐行同步展示 | 用户 | v1.0.4 | 网易云免加密 GET 接口（cloudsearch 搜索 → song/lyric 取词），LRC 解析 + 播放进度驱动高亮滚动；结果缓存到 `getCacheDir()/lyrics`；面板支持手动搜索更换 | `lyric/NeteaseLyric`、`lyric/Lyric`、`ui/PlayerActivity` |
+| E2 | 歌词搜索栏预填「歌手 歌名」，不含编号与 UP 主名 | 用户 | v1.0.6 | `suggestQuery(title, author)`：去括号标签 → 去 `P1/第N集/BV号/EP/CD/4K` 等编号噪声 → 剥离行首序号 → 「序号歌手 - 歌名」拆分为歌手+歌名组合，去重不重复拼接 | `lyric/NeteaseLyric.suggestQuery` |
+| E3 | 换歌自动刷新歌词搜索词与内容 | 自主 | v1.0.6 | `fetchLyricFor(cur)` 以 `lastLyricKey` 判断换曲自动重查 | `ui/PlayerActivity` |
+
+### F. 音量控制
+
+| ID | 需求 | 来源 | 版本 | 实现方式 | 主要代码 |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| F1 | 纵向音量条：既是调节 bar 也是显示 bar | 用户 | v1.0.4 | 自定义 `VolumeBar` View：竖向拖动改 `STREAM_MUSIC`，即时显示 `90/160`；500ms 轮询与系统/按键音量双向同步 | `ui/VolumeBar` |
+
+### G. 离线缓存
+
+| ID | 需求 | 来源 | 版本 | 实现方式 | 主要代码 |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| G1 | 缓存到本地，播放本地优先 | 用户 | v1.0.0 | `Downloader` 流式写盘；`startSource` 有本地文件直接 `setDataSource(path)`，否则带 Referer/UA 头拉 CDN 流 | `util/Downloader`、`player/PlaybackService.startSource` |
+| G2 | 缓存进度与速度在明显位置展示，并把状态+动作+进度+速度整合进一个按钮 | 用户 | v1.0.2 / v1.0.3 | 「缓存到本地」按钮整合四种状态：去缓存 / 缓存中 NN% · X KB/s（带填充背景）/ 已缓存 ✓ / 失败可重试；`ACT_DL` 广播驱动 | `ui/PlayerActivity`、`util/Downloader` |
+| G3 | 自动缓存下一首（可仅 WiFi） | 用户 | v1.0.0 | 切歌时后台预取下一首；`ConnectivityManager` 判断网络类型 | `util/Downloader` |
+| G4 | 空间管理：缓存占用显示与一键清理 | 用户 | v1.0.0 | 「我的」页实时统计音频/封面目录大小，提供清理入口 | `ui/MainActivity` |
+
+### H. 缺陷修复与工程加固
+
+| ID | 问题 | 来源 | 版本 | 修复方式 |
+| :-- | :-- | :-- | :-- | :-- |
+| H1 | Android 13+ 动态注册广播缺导出级别崩溃；内部广播收不到（播放 UI 不刷新） | 自主 | v1.0.2 | 统一走 `util/Receivers.registerLocal()`（SDK≥33 用 `RECEIVER_NOT_EXPORTED`）；内部广播发送方 `setPackage(getPackageName())` |
+| H2 | 播放失败 -38 错误 | 自主 | v1.0.2 | `MediaPlayer` 状态机错位（未 reset 复用/流失效），重取流前 reset 并校验 URL 时效 |
+| H3 | 一打开就闪退（NoClassDefFoundError） | 自主 | v1.0.3 | build.sh 的 javac 失败被管道静默吞掉，产出缺类 APK；脚本加固为 javac 失败立即退出报错 |
+| H4 | ListView 行内 clickable 子 View（⋮ 按钮）导致整行 `setOnItemClickListener` 失效 | 自主 | v1.0.0 | 不依赖 ListView item click，Adapter `getView()` 里直接给整行绑点击（`TrackAdapter.Listener.onPlay`） |
+| H5 | 无法使用 lambda（`-bootclasspath android.jar` 无 LambdaMetafactory） | 自主 | 构建约束 | 全项目匿名内部类；排序用 `Collections.sort` + 匿名 `Comparator` |
+| H6 | 分屏/浮窗每次改尺寸都重建 Activity | 自主 | v1.0.5 | `configChanges` 漏了 `smallestScreenSize`，补齐后不再重建 |
+| H7 | 冷启动后播放队列页为空（服务未运行，`PlaybackService.get()` 为 null） | 自主 | v1.0.6 | 新增 `PlaybackService.wake()`（无 action 的 `startForegroundService`，onCreate 会 restore 队列）；MainActivity/PlayerActivity/QueueActivity 按需唤醒 |
+| H8 | 布局属性 `hintTextColor` 不存在 | 自主 | v1.0.4 | 改用 `android:textColorHint` |
+
+---
+
+## 三、需求 → 实现要点速查表（按用户原始需求顺序）
+
+| # | 用户需求（原意） | 版本 | 实现要点 |
+| --: | :-- | :-- | :-- |
+| 1 | GitHub 直链下载安装 | v1.0.0 | `release/` 目录随仓库发布 + GitHub Releases 附件 + debug.keystore 入仓保证签名一致可覆盖安装 |
+| 2 | N6 真机验证（重点 B 站分享） | 持续 | adb/uiautomator/screencap 自动化验证流程，见 docs/TECHNICAL.md 第 10 节 |
+| 3 | 修播放不成功 / 播放键与进度不刷新 / 屏幕旋转 | v1.0.2 | 取流头修复、状态广播修复、旋转布局切换 |
+| 4 | 缓存进度与速度明显展示 | v1.0.2 | 下载广播 `ACT_DL` → 列表百分比 / 按钮文案 |
+| 5 | 修 -38 错误 | v1.0.2 | MediaPlayer 状态机加固 |
+| 6 | 缓存按钮整合状态/动作/进度/速度；曲库点击不自动播放 | v1.0.3 | 四态按钮；行点击=加入队列 |
+| 7 | 修启动闪退 | v1.0.3 | 构建脚本 javac 加固 |
+| 8 | 自动联网歌词并展示 | v1.0.4 | 网易云免加密接口 + LRC 同步高亮 |
+| 9 | 纵向音量条（调节+显示一体） | v1.0.4 | 自定义 `VolumeBar` |
+| 10 | 全屏→浮窗/分屏按窗口比例刷新重排 | v1.0.5 | `Win` 窗口度量 + 布局按宽高比显式切换 + 控件缩放 |
+| 11 | 歌词搜索栏预填歌手+歌名（去编号） | v1.0.6 | `suggestQuery` 清洗管道 |
+| 12 | 队列按钮放底部 | v1.0.6 | 移入播放页底部操作区 |
+| 13 | 队列页按曲库样式+正在播放标记+同类操作 | v1.0.6 | `QueueActivity` 复用 `TrackAdapter` |
+| 14 | 立即播放=入列并播放 | v1.0.6 | `insertAndPlay` |
+| 15 | 曲库按筛选范围批量导入播放 | v1.0.6 | `replaceQueue`（不打断当前曲） |
+| 16 | 迷你条播放事件提醒+标题动画 | v1.0.6 | 状态文案+进度线+过渡动画 |
+| 17 | 曲目列表与播放页「返回 B 站」 | v1.0.7 | `TrackActions.openBili`（bvid+分P → ACTION_VIEW） |
+
+---
+
+## 四、验证状态
+
+- **全部需求**均已在真机（OPPO N6 Android 16 / Samsung Note8 Android 9）完成功能验证；
+- v1.0.7「返回 B 站」在 Note8 上验证菜单项与跳转（见 release/README.md）；
+- 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）。
+
+---
+
+<p align="center"><sub>BMusic requirements · 更新于 v1.0.7</sub></p>

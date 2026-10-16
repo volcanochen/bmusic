@@ -68,9 +68,10 @@ public class PlayerActivity extends Activity {
     private TextView pageBadge;
     private Button btnCache;
     private Button btnQueue;
+    private Button btnBili;
     // Original leading icons of the action buttons, so they can be restored
     // when the window grows again.
-    private Drawable cacheIcon, plIcon, lyricIcon, queueIcon;
+    private Drawable cacheIcon, plIcon, lyricIcon, queueIcon, biliIcon;
 
     // vertical volume control
     private VolumeBar volBar;
@@ -203,6 +204,7 @@ public class PlayerActivity extends Activity {
         if (addPl != null) setHeight(addPl, compact ? 34 : 38);
         if (btnLyric != null) setHeight(btnLyric, compact ? 34 : 38);
         if (btnQueue != null) setHeight(btnQueue, compact ? 34 : 38);
+        if (btnBili != null) setHeight(btnBili, compact ? 34 : 38);
 
         // Narrow windows: forbid wrapping and drop the leading icons when the
         // three action labels would otherwise be clipped.
@@ -234,6 +236,7 @@ public class PlayerActivity extends Activity {
         tuneButton((Button) addPl, plIcon, compact, compact);
         tuneButton(btnLyric, lyricIcon, compact, compact);
         tuneButton(btnQueue, queueIcon, compact, compact);
+        tuneButton(btnBili, biliIcon, compact, compact);
         if (compact) return;
         final View row = findViewById(R.id.row_btns);
         if (row == null) return;
@@ -320,6 +323,7 @@ public class PlayerActivity extends Activity {
         pageBadge = (TextView) findViewById(R.id.n_badge);
         btnCache = (Button) findViewById(R.id.btn_cache);
         btnQueue = (Button) findViewById(R.id.btn_queue);
+        btnBili = (Button) findViewById(R.id.btn_bili);
         volBar = (VolumeBar) findViewById(R.id.vol_bar);
         volPct = (TextView) findViewById(R.id.vol_pct);
         btnLyric = (Button) findViewById(R.id.btn_lyric);
@@ -335,6 +339,7 @@ public class PlayerActivity extends Activity {
         plIcon = firstDrawable(addPl);
         lyricIcon = firstDrawable(btnLyric);
         queueIcon = firstDrawable(btnQueue);
+        biliIcon = firstDrawable(btnBili);
         initVolume();
     }
 
@@ -468,6 +473,14 @@ public class PlayerActivity extends Activity {
         cur = t;
         if (cur != null && !cur.id.equals(lastLyricKey)) {
             fetchLyricFor(cur);
+        }
+        if (btnBili != null) {
+            btnBili.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    TrackActions.openBili(PlayerActivity.this, cur);
+                }
+            });
         }
         if (btnQueue != null) {
             int n = svc != null ? svc.queue().size() : 0;

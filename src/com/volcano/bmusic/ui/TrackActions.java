@@ -3,6 +3,8 @@ package com.volcano.bmusic.ui;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.net.Uri;
 import android.widget.Toast;
 
 import com.volcano.bmusic.App;
@@ -27,7 +29,7 @@ public final class TrackActions {
 
     /** The standard library-style actions, in this order. */
     public static final String[] LIBRARY_ITEMS =
-            {"立即播放", "加入播放队列", "缓存到本地", "加入歌单", "删除曲目"};
+            {"立即播放", "加入播放队列", "缓存到本地", "加入歌单", "返回 B 站", "删除曲目"};
 
     private TrackActions() {
     }
@@ -56,6 +58,24 @@ public final class TrackActions {
         if (t == null) return;
         PlaybackService.append(a, t.id);
         Toast.makeText(a, "已加入队列", Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * 跳回 B 站该曲目的视频页面（多 P 视频定位到对应分 P）。
+     * 用 ACTION_VIEW 打开，系统会让用户在浏览器 / B 站 App 之间选择。
+     */
+    public static void openBili(Activity a, Track t) {
+        if (t == null || t.bvid == null || t.bvid.isEmpty()) {
+            Toast.makeText(a, "缺少 BV 号，无法跳转", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String url = "https://www.bilibili.com/video/" + t.bvid;
+        if (t.page > 0) url += "?p=" + (t.page + 1);
+        try {
+            a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception e) {
+            Toast.makeText(a, "没有可打开网页的应用", Toast.LENGTH_SHORT).show();
+        }
     }
 
     public static void cache(Activity a, Track t) {

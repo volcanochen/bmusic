@@ -4,12 +4,20 @@
 
 ## 当前版本
 
-- **版本号**：v1.0.6（`versionName 1.0.6` / `versionCode 7`）
+- **版本号**：v1.0.7（`versionName 1.0.7` / `versionCode 8`）
 - **包名**：`com.volcano.bmusic`
 - **最低系统**：Android 7.0（API 24）
 - **目标系统**：Android 14（API 34）
 - **体积**：约 160 KB（零第三方依赖，纯 Android SDK 构建）
 - **APK 文件**：[`bmusic.apk`](bmusic.apk)（本目录内，始终为最新版）
+
+### v1.0.7 更新内容
+- **新增「返回 B 站」**：曲目列表操作菜单（曲库 / 最近 / 歌单 / 队列）与播放页底部均可一键跳回
+  B 站该曲目的视频页面；多 P 视频自动定位到对应分 P（`?p=N`）
+  - 打开方式由系统分发：可选择浏览器或 B 站 App
+
+### 需求全集
+所有历史需求与实现对照见 [docs/requirements/README.md](../docs/requirements/README.md)。
 
 ### v1.0.6 更新内容
 - **歌词搜索栏智能预填**：自动填入「歌手 歌名」，去掉 P1 / 第N集 / BV号等编号噪声，不再混入 UP 主名

@@ -36,7 +36,7 @@ public class QueueActivity extends Activity {
     private ArrayList<Track> data = new ArrayList<Track>();
 
     private static final String[] ITEMS = {"立即播放", "上移", "下移", "缓存到本地",
-            "加入歌单", "从队列移除", "删除曲目"};
+            "加入歌单", "返回 B 站", "从队列移除", "删除曲目"};
 
     @Override
     protected void onCreate(Bundle b) {
@@ -136,10 +136,13 @@ public class QueueActivity extends Activity {
                         TrackActions.addToPlaylist(QueueActivity.this, track);
                         break;
                     case 5:
+                        TrackActions.openBili(QueueActivity.this, track);
+                        break;
+                    case 6:
                         PlaybackService.editQueue(QueueActivity.this, track.id, 0);
                         Toast.makeText(QueueActivity.this, "已从队列移除", Toast.LENGTH_SHORT).show();
                         break;
-                    case 6:
+                    case 7:
                         TrackActions.confirmDelete(QueueActivity.this, track, null);
                         break;
                 }

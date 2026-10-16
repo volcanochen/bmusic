@@ -94,7 +94,7 @@ public class PlaylistActivity extends Activity {
 
     private void menu(final Track t) {
         final String[] items = {"立即播放", "上移", "下移", "缓存到本地", "加入歌单",
-                "从歌单移除", "删除曲目"};
+                "返回 B 站", "从歌单移除", "删除曲目"};
         TrackActions.showMenu(this, t, items, new TrackActions.ItemHandler() {
             @Override
             public void onItem(Track track, int which) {
@@ -115,9 +115,12 @@ public class PlaylistActivity extends Activity {
                         TrackActions.addToPlaylist(PlaylistActivity.this, track);
                         break;
                     case 5:
-                        removeFrom(track);
+                        TrackActions.openBili(PlaylistActivity.this, track);
                         break;
                     case 6:
+                        removeFrom(track);
+                        break;
+                    case 7:
                         TrackActions.confirmDelete(PlaylistActivity.this, track, new Runnable() {
                             @Override
                             public void run() {

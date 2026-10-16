@@ -295,17 +295,40 @@
                 android:orientation="horizontal">
 
                 <Button
-                    android:id="@+id/btn_queue"
-                    android:layout_width="match_parent"
+                    android:id="@+id/btn_bili"
+                    android:layout_width="0dp"
                     android:layout_height="38dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/ripple_round"
+                    android:drawableLeft="@drawable/ic_bili"
+                    android:drawablePadding="6dp"
+                    android:drawableTint="@color/text_sub"
+                    android:gravity="center"
+                    android:minWidth="0dp"
+                    android:paddingLeft="10dp"
+                    android:paddingRight="10dp"
+                    android:text="返回 B 站"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_sub"
+                    android:textSize="12sp" />
+
+                <Space
+                    android:layout_width="12dp"
+                    android:layout_height="1dp" />
+
+                <Button
+                    android:id="@+id/btn_queue"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1"
                     android:background="@drawable/ripple_round"
                     android:drawableLeft="@drawable/ic_queue"
                     android:drawablePadding="6dp"
                     android:drawableTint="@color/text_sub"
                     android:gravity="center"
                     android:minWidth="0dp"
-                    android:paddingLeft="16dp"
-                    android:paddingRight="16dp"
+                    android:paddingLeft="10dp"
+                    android:paddingRight="10dp"
                     android:text="@string/current_queue"
                     android:textAllCaps="false"
                     android:textColor="@color/text_sub"
