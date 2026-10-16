@@ -8,6 +8,7 @@ import android.content.ClipboardManager;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.res.Configuration;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.BroadcastReceiver;
@@ -48,6 +49,7 @@ import com.volcano.bmusic.util.Downloader;
 import com.volcano.bmusic.util.Notify;
 import com.volcano.bmusic.util.PartAsk;
 import com.volcano.bmusic.util.Receivers;
+import com.volcano.bmusic.util.Win;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -90,7 +92,52 @@ public class MainActivity extends Activity {
         initActions();
         askNotify();
         reloadAll();
+        applyWindowSize();
         handleIntent(getIntent());
+    }
+
+    /* --------- window shape: split-screen / freeform / rotation --------- */
+
+    @Override
+    public void onConfigurationChanged(Configuration c) {
+        super.onConfigurationChanged(c);
+        applyWindowSize();
+    }
+
+    @Override
+    public void onMultiWindowModeChanged(boolean inMultiWindowMode) {
+        super.onMultiWindowModeChanged(inMultiWindowMode);
+        applyWindowSize();
+    }
+
+    /** Re-fit the chrome (bottom nav, mini player, recent list) to the window. */
+    private void applyWindowSize() {
+        float d = getResources().getDisplayMetrics().density;
+        if (d <= 0f) d = 1f;
+        int[] s = Win.sizeDp(this);
+        int hDp = s[1];
+        boolean compact = hDp < 560;
+
+        View nav = findViewById(R.id.nav);
+        if (nav != null) {
+            ViewGroup.LayoutParams lp = nav.getLayoutParams();
+            lp.height = Math.round((compact ? 44 : 54) * d);
+            nav.setLayoutParams(lp);
+        }
+        if (mini != null) {
+            ViewGroup.LayoutParams lp = mini.getLayoutParams();
+            lp.height = Math.round((compact ? 52 : 60) * d);
+            mini.setLayoutParams(lp);
+        }
+        // The "recent" list has a fixed height; scale it with the window so it
+        // never pushes the rest of the page off a short (split / floating) window.
+        if (listRecent != null) {
+            int hh = (int) (hDp * 0.34f);
+            hh = Math.max(110, Math.min(240, hh));
+            ViewGroup.LayoutParams lp = listRecent.getLayoutParams();
+            lp.height = Math.round(hh * d);
+            listRecent.setLayoutParams(lp);
+        }
     }
 
     @Override

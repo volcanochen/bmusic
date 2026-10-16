@@ -65,14 +65,15 @@
             android:layout_weight="0.6" />
 
         <FrameLayout
+            android:id="@+id/art_box"
             android:layout_width="230dp"
             android:layout_height="230dp"
             android:layout_gravity="center_horizontal">
 
             <ImageView
                 android:id="@+id/art"
-                android:layout_width="230dp"
-                android:layout_height="230dp"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
                 android:background="@drawable/shape_card"
                 android:scaleType="centerCrop"
                 android:src="@drawable/ic_music_note" />
@@ -130,6 +131,7 @@
                 android:textSize="13sp" />
 
             <LinearLayout
+                android:id="@+id/row_seek"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="22dp"
@@ -166,6 +168,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/row_ctrl"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
@@ -231,6 +234,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/row_btns"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"

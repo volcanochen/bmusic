@@ -17,6 +17,7 @@
         android:background="#86000000" />
 
     <LinearLayout
+        android:id="@+id/player_root"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="horizontal"
@@ -126,6 +127,7 @@
                 android:textSize="13sp" />
 
             <LinearLayout
+                android:id="@+id/row_seek"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
@@ -162,6 +164,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/row_ctrl"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
@@ -227,6 +230,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/row_btns"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"

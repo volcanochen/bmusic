@@ -303,6 +303,38 @@ interface Listener {
 
 底部常驻，展示当前曲的封面 / 标题 / 作者与播放暂停、下一首按钮；点击进入播放页。刷新由 `ACT_STATE` / `ACT_COVER` 广播驱动。
 
+### 8.5 分屏 / 浮窗（自由窗口）适配
+
+多窗口下窗口尺寸可随时变化，且**不再等于物理屏幕**，因此布局不能依赖整机方向。
+
+**(1) 不重建 Activity。** 四个 Activity 都声明：
+
+```xml
+android:resizeableActivity="true"
+android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden|fontScale|uiMode"
+```
+
+关键点是 **`smallestScreenSize`**：进入分屏 / 拖动浮窗时它会变化，若未声明，系统会**销毁并重建** Activity——播放页的歌词面板状态、每次拖动都重建的抖动都由此而来。声明后改由应用自己处理。
+
+**(2) 以窗口为单位度量（`util/Win`）。**
+
+```java
+Win.sizeDp(activity)   // API 30+ 用 WindowMetrics#getCurrentWindowMetrics；
+                       // API 24+ 回退 Configuration.screenWidthDp/HeightDp（多窗口下即为窗口值）
+Win.wide(activity)     // 窗口宽 > 高
+```
+
+`getDefaultDisplay()` 在多窗口下返回的是**屏幕**尺寸而非窗口尺寸，不能用于这里的判断。
+
+**(3) 播放页按窗口比例重排（`PlayerActivity`）。**
+
+- 布局不再依赖 `-land` 资源限定符：横屏版改名为 `res/layout/activity_player_land.xml`，由代码按 `Win.wide()` **显式选择**，窗口宽高比变化时 `setContentView` 换布局并重新 `bind()/actions()`（歌词面板的开合状态用 `lyricOpen` 记录后恢复）。
+- 回调入口：`onConfigurationChanged` 与 `onMultiWindowModeChanged` 都走同一个 `relayoutForWindow()`。
+- `applyWindowSize()` 按窗口 dp 缩放内容：封面取 `min(w×0.62, h×0.30)`（钳制 96–260dp）、竖向音量条高度取 `min(190, h×0.30)`、播放键 72→56dp、其余按键 52/48→44/40dp；`h<660dp` 为紧凑模式，`h<470dp` 为极窄模式（隐藏状态行、压缩行距与内边距）。
+- 底部三个操作按钮（缓存 / 加入歌单 / 歌词）先按常规排版，再在 `post()` 里用 `Layout.getEllipsisCount(0)` 检查是否被截断，若被截断则去掉前置图标并缩小字号后重排——**基于实测宽度而非拍脑袋阈值**，任意窗口尺寸都成立。
+
+**(4) 主界面（`MainActivity`）** 只做重量级元素的自适应：底栏 54→44dp、迷你条 60→52dp、"最近播放"列表高度 `h×0.34`（钳制 110–240dp）。
+
 ---
 
 ## 9. 无 Gradle 构建流水线（`build.sh`）

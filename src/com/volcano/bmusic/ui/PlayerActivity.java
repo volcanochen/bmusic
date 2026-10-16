@@ -7,11 +7,14 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.res.Configuration;
 import android.media.AudioManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
+import android.text.Layout;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -21,6 +24,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.view.ViewGroup;
 import android.widget.Toast;
 import android.widget.Button;
 import android.graphics.Color;
@@ -41,6 +45,7 @@ import com.volcano.bmusic.player.PlaybackService;
 import com.volcano.bmusic.util.CoverLoader;
 import com.volcano.bmusic.util.Downloader;
 import com.volcano.bmusic.util.Receivers;
+import com.volcano.bmusic.util.Win;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -62,6 +67,9 @@ public class PlayerActivity extends Activity {
     private TextView hint;
     private TextView pageBadge;
     private Button btnCache;
+    // Original leading icons of the action buttons, so they can be restored
+    // when the window grows again.
+    private Drawable cacheIcon, plIcon, lyricIcon;
 
     // vertical volume control
     private VolumeBar volBar;
@@ -86,6 +94,11 @@ public class PlayerActivity extends Activity {
     private final Handler handler = new Handler();
     private Track cur;
 
+    // Window-shape state: which layout is currently inflated and whether the
+    // lyrics sheet is open, so both can be restored after a re-inflate.
+    private boolean landLayout = false;
+    private boolean lyricOpen = false;
+
     // Guaranteed UI refresh: poll the service directly every 500ms so the
     // play/pause icon and progress bar always track playback, even if a
     // broadcast is missed.
@@ -100,10 +113,190 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
-        setContentView(R.layout.activity_player);
+        landLayout = Win.wide(this);
+        setContentView(landLayout ? R.layout.activity_player_land : R.layout.activity_player);
         bind();
         actions();
+        applyWindowSize();
         refresh();
+    }
+
+    /* ---------------- window shape: split-screen / freeform / rotation ---------------- */
+
+    /**
+     * Called whenever the size (or aspect ratio) of our window changed:
+     * rotation, entering / leaving split-screen or freeform, and dragging the
+     * divider or a floating window handle. We re-pick the layout and re-scale
+     * the content so everything stays inside the new bounds.
+     */
+    private void relayoutForWindow() {
+        boolean wide = Win.wide(this);
+        if (wide != landLayout) {
+            landLayout = wide;
+            if (lyricPanel != null) {
+                lyricOpen = lyricPanel.getVisibility() == View.VISIBLE;
+            }
+            setContentView(landLayout ? R.layout.activity_player_land : R.layout.activity_player);
+            bind();
+            actions();
+            if (lyricOpen && lyricPanel != null) {
+                lyricPanel.setVisibility(View.VISIBLE);
+                if (lyric != null) renderLyric(lyric);
+            }
+        }
+        applyWindowSize();
+        refresh();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration c) {
+        super.onConfigurationChanged(c);
+        relayoutForWindow();
+    }
+
+    @Override
+    public void onMultiWindowModeChanged(boolean inMultiWindowMode) {
+        super.onMultiWindowModeChanged(inMultiWindowMode);
+        relayoutForWindow();
+    }
+
+    /** Scale the content to the current window size (dp based, ratio aware). */
+    private void applyWindowSize() {
+        int[] s = Win.sizeDp(this);
+        int wDp = s[0];
+        int hDp = s[1];
+        float d = getResources().getDisplayMetrics().density;
+        if (d <= 0f) d = 1f;
+        boolean compact = hDp < 660;
+        boolean tiny = hDp < 470;
+
+        // Cover art: never let it eat more than a third of a short window.
+        View artBox = findViewById(R.id.art_box);
+        if (artBox != null) {
+            int size = (int) Math.min(wDp * 0.62f, hDp * 0.30f);
+            size = Math.max(96, Math.min(260, size));
+            setSize(artBox, size, size);
+        }
+
+        // Vertical volume bar must fit the window height too.
+        if (volBar != null) {
+            int vh = (int) Math.min(190f, hDp * 0.30f);
+            vh = Math.max(84, vh);
+            setSize(volBar, 44, vh);
+        }
+
+        // Compact windows: shrink the transport controls so they still fit.
+        if (btnPlay != null) {
+            int big = compact ? 56 : 72;
+            setSize(btnPlay, big, big);
+            btnPlay.setPadding((int) (big * 0.28f * d), (int) (big * 0.28f * d),
+                    (int) (big * 0.28f * d), (int) (big * 0.28f * d));
+        }
+        if (btnPrev != null) setSize(btnPrev, compact ? 44 : 52, compact ? 44 : 52);
+        if (btnNext != null) setSize(btnNext, compact ? 44 : 52, compact ? 44 : 52);
+        if (btnMode != null) setSize(btnMode, compact ? 40 : 48, compact ? 40 : 48);
+        if (btnFav != null) setSize(btnFav, compact ? 40 : 48, compact ? 40 : 48);
+        if (btnCache != null) setHeight(btnCache, compact ? 34 : 38);
+        View addPl = findViewById(R.id.btn_add_pl);
+        if (addPl != null) setHeight(addPl, compact ? 34 : 38);
+        if (btnLyric != null) setHeight(btnLyric, compact ? 34 : 38);
+
+        // Narrow windows: forbid wrapping and drop the leading icons when the
+        // three action labels would otherwise be clipped.
+        tuneActionButtons(compact);
+
+        // Tighten the vertical rhythm so the whole column still fits a short window.
+        setTopMargin(findViewById(R.id.row_seek), tiny ? 8 : (compact ? 14 : -1));
+        setTopMargin(findViewById(R.id.row_ctrl), tiny ? 6 : (compact ? 10 : -1));
+        setTopMargin(findViewById(R.id.row_btns), tiny ? 8 : (compact ? 12 : -1));
+        View root = findViewById(R.id.player_root);   // landscape only
+        if (root != null) setPadding(root, tiny ? 6 : (compact ? 10 : 16));
+        if (title != null) title.setTextSize(tiny ? 16 : (landLayout ? 19 : 18));
+        if (author != null) author.setTextSize(tiny ? 11 : 13);
+
+        // Status line is the first thing to go when space is really tight.
+        if (hint != null) hint.setVisibility(tiny ? View.GONE : View.VISIBLE);
+    }
+
+    /**
+     * Keep the three action labels readable in a cramped window. Icons are the
+     * first thing to give up: if any label ends up clipped after the layout
+     * pass, we drop all three leading icons and try again. It runs after
+     * layout so the decision is based on the real measured width, which makes
+     * it correct for any window size instead of a hard-coded threshold.
+     */
+    private void tuneActionButtons(boolean compact) {
+        final View addPl = findViewById(R.id.btn_add_pl);
+        tuneButton(btnCache, cacheIcon, compact, compact);
+        tuneButton((Button) addPl, plIcon, compact, compact);
+        tuneButton(btnLyric, lyricIcon, compact, compact);
+        if (compact) return;
+        final View row = findViewById(R.id.row_btns);
+        if (row == null) return;
+        row.post(new Runnable() {
+            @Override
+            public void run() {
+                if (!isClipped(btnCache) && !isClipped(addPl) && !isClipped(btnLyric)) return;
+                tuneButton(btnCache, cacheIcon, true, true);
+                tuneButton((Button) addPl, plIcon, true, true);
+                tuneButton(btnLyric, lyricIcon, true, true);
+            }
+        });
+    }
+
+    private void tuneButton(Button b, Drawable icon, boolean iconless, boolean smallText) {
+        if (b == null) return;
+        b.setSingleLine(true);
+        b.setEllipsize(TextUtils.TruncateAt.END);
+        b.setTextSize(smallText ? 11 : 12);
+        b.setCompoundDrawables(iconless ? null : icon, null, null, null);
+    }
+
+    /** True when a label had to be truncated to fit its button. */
+    private static boolean isClipped(View v) {
+        if (!(v instanceof TextView)) return false;
+        Layout l = ((TextView) v).getLayout();
+        return l != null && l.getEllipsisCount(0) > 0;
+    }
+
+    /** Set a child's top margin in dp (-1 = keep the value from the layout). */
+    private void setTopMargin(View v, int dp) {
+        if (v == null || dp < 0) return;
+        float d = getResources().getDisplayMetrics().density;
+        if (d <= 0f) d = 1f;
+        ViewGroup.LayoutParams lp = v.getLayoutParams();
+        if (!(lp instanceof LinearLayout.LayoutParams)) return;
+        ((LinearLayout.LayoutParams) lp).topMargin = Math.round(dp * d);
+        v.setLayoutParams(lp);
+    }
+
+    /** Set a view's uniform padding in dp. */
+    private void setPadding(View v, int dp) {
+        float d = getResources().getDisplayMetrics().density;
+        if (d <= 0f) d = 1f;
+        int px = Math.round(dp * d);
+        v.setPadding(px, px, px, px);
+    }
+
+    /** Set a view's height in dp, leaving its width untouched. */
+    private void setHeight(View v, int hDp) {
+        float d = getResources().getDisplayMetrics().density;
+        if (d <= 0f) d = 1f;
+        ViewGroup.LayoutParams lp = v.getLayoutParams();
+        if (lp == null) return;
+        lp.height = Math.round(hDp * d);
+        v.setLayoutParams(lp);
+    }
+
+    /** Set a view's size in dp, keeping whatever layout params type it has. */
+    private void setSize(View v, int wDp, int hDp) {
+        float d = getResources().getDisplayMetrics().density;
+        if (d <= 0f) d = 1f;
+        ViewGroup.LayoutParams lp = v.getLayoutParams();
+        if (lp == null) return;
+        lp.width = wDp < 0 ? wDp : Math.round(wDp * d);
+        lp.height = hDp < 0 ? hDp : Math.round(hDp * d);
+        v.setLayoutParams(lp);
     }
 
     private void bind() {
@@ -132,7 +325,18 @@ public class PlayerActivity extends Activity {
         lyricLines = (LinearLayout) findViewById(R.id.lyric_lines);
         lyricScroll = (ScrollView) findViewById(R.id.lyric_scroll);
         lyricStatus = (TextView) findViewById(R.id.lyric_status);
+        View addPl = findViewById(R.id.btn_add_pl);
+        cacheIcon = firstDrawable(btnCache);
+        plIcon = firstDrawable(addPl);
+        lyricIcon = firstDrawable(btnLyric);
         initVolume();
+    }
+
+    /** Leading compound drawable of a TextView (null when there is none). */
+    private static Drawable firstDrawable(View v) {
+        if (!(v instanceof TextView)) return null;
+        Drawable[] ds = ((TextView) v).getCompoundDrawables();
+        return ds == null || ds.length == 0 ? null : ds[0];
     }
 
     private void actions() {
@@ -210,6 +414,7 @@ public class PlayerActivity extends Activity {
                 @Override
                 public void onClick(View v) {
                     if (lyricPanel != null) lyricPanel.setVisibility(View.GONE);
+                    lyricOpen = false;
                 }
             });
         }
@@ -477,9 +682,11 @@ public class PlayerActivity extends Activity {
         if (lyricPanel == null) return;
         if (lyricPanel.getVisibility() == View.VISIBLE) {
             lyricPanel.setVisibility(View.GONE);
+            lyricOpen = false;
             return;
         }
         lyricPanel.setVisibility(View.VISIBLE);
+        lyricOpen = true;
         if (lyricQuery != null) {
             String curQ = lyricQuery.getText() == null ? "" : lyricQuery.getText().toString().trim();
             if (curQ.isEmpty() && cur != null) {
