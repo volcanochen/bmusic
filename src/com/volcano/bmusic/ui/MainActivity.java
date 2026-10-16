@@ -181,7 +181,8 @@ public class MainActivity extends Activity {
         trackAdapter = new TrackAdapter(this, new TrackAdapter.Listener() {
             @Override
             public void onPlay(List<Track> list, int pos) {
-                playFrom(list, pos, -1);
+                PlaybackService.append(MainActivity.this, list.get(pos).id);
+                Toast.makeText(MainActivity.this, "已加入队列", Toast.LENGTH_SHORT).show();
             }
             @Override
             public void onMore(View anchor, Track t) {
@@ -200,7 +201,8 @@ public class MainActivity extends Activity {
         recentAdapter = new TrackAdapter(this, new TrackAdapter.Listener() {
             @Override
             public void onPlay(List<Track> list, int pos) {
-                playFrom(list, pos, -1);
+                PlaybackService.append(MainActivity.this, list.get(pos).id);
+                Toast.makeText(MainActivity.this, "已加入队列", Toast.LENGTH_SHORT).show();
             }
             @Override
             public void onMore(View anchor, Track t) {

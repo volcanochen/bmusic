@@ -26,4 +26,12 @@
     <string name="hint_paste">粘贴B站视频链接 / BV号 / av号，一行一个</string>
     <string name="added_to_lib">已添加到曲库并开始解析</string>
     <string name="parse_failed">解析失败</string>
+
+    <string name="lyrics">歌词</string>
+    <string name="search">搜索</string>
+    <string name="volume">音量</string>
+    <string name="lyric_search_hint">输入歌名 / 歌手，搜索歌词</string>
+    <string name="lyric_loading">正在搜索歌词…</string>
+    <string name="lyric_not_found">未找到歌词，可手动搜索</string>
+    <string name="lyric_panel_title">歌词</string>
 </resources>

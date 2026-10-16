@@ -119,6 +119,7 @@ public class CoverLoader {
             if (d != null) {
                 mem.put(url, d);
                 Intent i = new Intent(ACT_COVER);
+                i.setPackage(App.ctx().getPackageName());
                 i.putExtra("url", url);
                 App.ctx().sendBroadcast(i);
                 return d;

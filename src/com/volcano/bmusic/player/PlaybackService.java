@@ -78,6 +78,9 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
     private int mode = MODE_LOOP;
     private boolean playing = false;
     private boolean loading = false;
+    private boolean mpReady = false;
+    private boolean startWhenReady = true;
+    private int pendingSeek = -1;
     private int lastError = 0;
     private int retry = 0;
 
@@ -135,12 +138,32 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
                 setQueue(pid, ids, startTid, auto);
             } else if (A_MODE.equals(a)) {
                 switchMode();
-            } else if (A_APPEND.equals(a)) {
-                String id = intent.getStringExtra("id");
-                if (id != null && !queueIds.contains(id)) queueIds.add(id);
-                if (cur == null && !queueIds.isEmpty()) openIndex(index < 0 ? 0 : index, true);
-                saveQueue();
+        } else if (A_APPEND.equals(a)) {
+            String id = intent.getStringExtra("id");
+            if (id == null) return START_STICKY;
+            boolean wasIdle = (cur == null);
+            if (!queueIds.contains(id)) queueIds.add(id);
+            if (wasIdle) {
+                index = queueIds.indexOf(id);
+                Track t = Db.get(this).get(id);
+                if (t != null) {
+                    cur = t;
+                    App.prefs().edit().putString("last_id", id).apply();
+                    retry = 0;
+                    loading = true;
+                    startWhenReady = false; // load the track but do NOT auto-play
+                    broadcastState();
+                    refreshNotify();
+                    requestFocus(new Runnable() {
+                        @Override
+                        public void run() {
+                            startSource(id);
+                        }
+                    });
+                }
             }
+            saveQueue();
+        }
         }
         return START_STICKY;
     }
@@ -193,6 +216,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         }
         playing = false;
         loading = false;
+        mpReady = false;
     }
 
     private void initSession() {
@@ -337,6 +361,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         App.prefs().edit().putString("last_id", id).apply();
         retry = 0;
         loading = true;
+        startWhenReady = autoplay;
         playing = false;
         broadcastState();
         refreshNotify();
@@ -371,6 +396,8 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
             releasePlayer();
             initPlayer();
         }
+        mpReady = false;
+        pendingSeek = -1;
         try {
             if (t.hasLocal()) {
                 mp.setAudioStreamType(AudioManager.STREAM_MUSIC);
@@ -434,6 +461,14 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         public void onPrepared(MediaPlayer m) {
             loading = false;
             retry = 0;
+            mpReady = true;
+            if (pendingSeek >= 0) {
+                try {
+                    m.seekTo(pendingSeek);
+                } catch (Exception ignored) {
+                }
+                pendingSeek = -1;
+            }
             if (cur != null && cur.id != null) {
                 try {
                     int d = m.getDuration();
@@ -444,7 +479,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
                 } catch (Exception ignored) {
                 }
             }
-            doPlay();
+            if (startWhenReady) doPlay();
             broadcastState();
             updateMetadata();
             refreshNotify();
@@ -459,7 +494,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
     private final MediaPlayer.OnCompletionListener completed = new MediaPlayer.OnCompletionListener() {
         @Override
         public void onCompletion(MediaPlayer m) {
-            if (mode == MODE_SINGLE) {
+            if (mode == MODE_SINGLE && mpReady) {
                 try {
                     m.seekTo(0);
                     m.start();
@@ -478,8 +513,15 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         @Override
         public boolean onError(MediaPlayer m, int what, int extra) {
             Log.e(TAG, "player error " + what + "/" + extra);
+            // -38 == operation invoked in an illegal state (e.g. seek while
+            // still preparing, or a stray call right after reset). This is
+            // transient and almost always recoverable, so just swallow it
+            // instead of showing "播放失败" and skipping the track.
+            if (what == -38 || extra == -38) {
+                return true;
+            }
             lastError = what;
-            if (cur != null && !cur.hasLocal() && retry < 1) {
+            if (cur != null && !cur.hasLocal() && retry < 3) {
                 retry++;
                 cur.streamUrl = null;
                 startSource(cur.id);
@@ -506,6 +548,21 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
             return;
         }
         if (loading) return;
+        if (cur != null && (mp == null || !mpReady)) {
+            // Player not prepared yet (e.g. right after an app restart, or the
+            // track was only enqueued without autoplay): (re)prepare the current
+            // track and play it once ready.
+            loading = true;
+            startWhenReady = true;
+            broadcastState();
+            requestFocus(new Runnable() {
+                @Override
+                public void run() {
+                    startSource(cur.id);
+                }
+            });
+            return;
+        }
         requestFocus(new Runnable() {
             @Override
             public void run() {
@@ -515,7 +572,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
     }
 
     private void doPlay() {
-        if (mp == null) return;
+        if (mp == null || !mpReady) return;
         try {
             if (!playing) {
                 mp.start();
@@ -532,7 +589,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
     }
 
     public void pause() {
-        if (mp != null && playing) {
+        if (mp != null && mpReady && playing) {
             try {
                 mp.pause();
             } catch (Exception ignored) {
@@ -584,6 +641,11 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
 
     public void seek(int pos) {
         if (mp == null) return;
+        if (!mpReady) {
+            // remember and apply after prepare completes
+            pendingSeek = pos;
+            return;
+        }
         try {
             int d = mp.getDuration();
             if (d > 0 && pos > d) pos = d;
@@ -648,7 +710,8 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
 
     public int position() {
         try {
-            return mp == null ? 0 : mp.getCurrentPosition();
+            if (mp == null || !mpReady) return 0;
+            return mp.getCurrentPosition();
         } catch (Exception e) {
             return 0;
         }
@@ -656,8 +719,10 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
 
     public int duration() {
         try {
-            int d = mp == null ? 0 : mp.getDuration();
-            if (d > 0) return d;
+            if (mp != null && mpReady) {
+                int d = mp.getDuration();
+                if (d > 0) return d;
+            }
         } catch (Exception ignored) {
         }
         return cur == null ? 0 : (int) cur.duration;

@@ -239,8 +239,9 @@
 
                 <Button
                     android:id="@+id/btn_cache"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="38dp"
+                    android:layout_weight="1"
                     android:background="@drawable/ripple_round"
                     android:drawableLeft="@drawable/ic_download"
                     android:drawablePadding="6dp"
@@ -268,7 +269,27 @@
                     android:minWidth="0dp"
                     android:paddingLeft="14dp"
                     android:paddingRight="14dp"
-                    android:text="加入歌单"
+                android:text="加入歌单"
+                android:textAllCaps="false"
+                android:textColor="@color/text_sub"
+                android:textSize="12sp" />
+
+                <View
+                    android:layout_width="8dp"
+                    android:layout_height="1dp" />
+
+                <Button
+                    android:id="@+id/btn_lyric"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:background="@drawable/ripple_round"
+                    android:drawableLeft="@drawable/ic_lyric"
+                    android:drawablePadding="6dp"
+                    android:drawableTint="@color/text_sub"
+                    android:minWidth="0dp"
+                    android:paddingLeft="14dp"
+                    android:paddingRight="14dp"
+                    android:text="@string/lyrics"
                     android:textAllCaps="false"
                     android:textColor="@color/text_sub"
                     android:textSize="12sp" />
@@ -286,4 +307,132 @@
                 android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>
+
+    <!-- vertical volume control (bar doubles as display + control) -->
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="10dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <TextView
+                android:id="@+id/vol_pct"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0/0"
+                android:textColor="@color/text_dim"
+                android:textSize="10sp" />
+
+            <com.volcano.bmusic.ui.VolumeBar
+                android:id="@+id/vol_bar"
+                android:layout_width="44dp"
+                android:layout_height="190dp"
+                android:layout_marginTop="4dp"
+                android:contentDescription="@string/volume" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- lyrics panel -->
+    <FrameLayout
+        android:id="@+id/lyric_panel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#E612141C"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/lyric_panel_title"
+                    android:textColor="@color/text"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <ImageButton
+                    android:id="@+id/lyric_close"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@null"
+                    android:src="@drawable/ic_close"
+                    android:tint="@color/text_sub"
+                    android:contentDescription="关闭" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/lyric_query"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/shape_card"
+                    android:hint="@string/lyric_search_hint"
+                    android:textColorHint="@color/text_dim"
+                    android:imeOptions="actionSearch"
+                    android:inputType="text"
+                    android:paddingLeft="12dp"
+                    android:paddingRight="12dp"
+                    android:textColor="@color/text"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/lyric_search"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:layout_marginLeft="8dp"
+                    android:background="@drawable/ripple_round"
+                    android:text="@string/search"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_sub"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/lyric_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:textColor="@color/text_dim"
+                android:textSize="11sp" />
+
+            <ScrollView
+                android:id="@+id/lyric_scroll"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="8dp">
+
+                <LinearLayout
+                    android:id="@+id/lyric_lines"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingBottom="60dp" />
+            </ScrollView>
+        </LinearLayout>
+    </FrameLayout>
 </FrameLayout>

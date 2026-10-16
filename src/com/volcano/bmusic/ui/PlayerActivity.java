@@ -7,21 +7,34 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.media.AudioManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.Button;
+import android.graphics.Color;
+import android.graphics.drawable.ClipDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
+import android.view.Gravity;
 
 import com.volcano.bmusic.App;
 import com.volcano.bmusic.R;
 import com.volcano.bmusic.db.Db;
+import com.volcano.bmusic.lyric.Lyric;
+import com.volcano.bmusic.lyric.NeteaseLyric;
 import com.volcano.bmusic.model.Playlist;
 import com.volcano.bmusic.model.Track;
 import com.volcano.bmusic.player.PlaybackService;
@@ -48,6 +61,26 @@ public class PlayerActivity extends Activity {
     private ImageButton btnFav;
     private TextView hint;
     private TextView pageBadge;
+    private Button btnCache;
+
+    // vertical volume control
+    private VolumeBar volBar;
+    private TextView volPct;
+    private AudioManager am;
+    private int volMax = 1;
+
+    // lyrics
+    private Button btnLyric;
+    private FrameLayout lyricPanel;
+    private EditText lyricQuery;
+    private Button lyricSearchBtn;
+    private ImageButton lyricClose;
+    private LinearLayout lyricLines;
+    private ScrollView lyricScroll;
+    private TextView lyricStatus;
+    private Lyric lyric;
+    private int lastLyricIdx = -1;
+    private String lastLyricKey = null;
 
     private boolean dragging = false;
     private final Handler handler = new Handler();
@@ -88,6 +121,18 @@ public class PlayerActivity extends Activity {
         btnFav = (ImageButton) findViewById(R.id.btn_fav);
         hint = (TextView) findViewById(R.id.hint);
         pageBadge = (TextView) findViewById(R.id.n_badge);
+        btnCache = (Button) findViewById(R.id.btn_cache);
+        volBar = (VolumeBar) findViewById(R.id.vol_bar);
+        volPct = (TextView) findViewById(R.id.vol_pct);
+        btnLyric = (Button) findViewById(R.id.btn_lyric);
+        lyricPanel = (FrameLayout) findViewById(R.id.lyric_panel);
+        lyricQuery = (EditText) findViewById(R.id.lyric_query);
+        lyricSearchBtn = (Button) findViewById(R.id.lyric_search);
+        lyricClose = (ImageButton) findViewById(R.id.lyric_close);
+        lyricLines = (LinearLayout) findViewById(R.id.lyric_lines);
+        lyricScroll = (ScrollView) findViewById(R.id.lyric_scroll);
+        lyricStatus = (TextView) findViewById(R.id.lyric_status);
+        initVolume();
     }
 
     private void actions() {
@@ -135,7 +180,7 @@ public class PlayerActivity extends Activity {
                 showQueue();
             }
         });
-        findViewById(R.id.btn_cache).setOnClickListener(new View.OnClickListener() {
+        btnCache.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if (cur == null) return;
@@ -144,7 +189,6 @@ public class PlayerActivity extends Activity {
                     return;
                 }
                 Downloader.start(PlayerActivity.this, cur);
-                Toast.makeText(PlayerActivity.this, "开始缓存...", Toast.LENGTH_SHORT).show();
             }
         });
         findViewById(R.id.btn_add_pl).setOnClickListener(new View.OnClickListener() {
@@ -153,6 +197,30 @@ public class PlayerActivity extends Activity {
                 choosePlaylist();
             }
         });
+        if (btnLyric != null) {
+            btnLyric.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    toggleLyricPanel();
+                }
+            });
+        }
+        if (lyricClose != null) {
+            lyricClose.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (lyricPanel != null) lyricPanel.setVisibility(View.GONE);
+                }
+            });
+        }
+        if (lyricSearchBtn != null) {
+            lyricSearchBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    manualSearch();
+                }
+            });
+        }
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
@@ -187,6 +255,9 @@ public class PlayerActivity extends Activity {
             if (id != null) t = Db.get(this).get(id);
         }
         cur = t;
+        if (cur != null && !cur.id.equals(lastLyricKey)) {
+            fetchLyricFor(cur);
+        }
         if (t == null) {
             title.setText("未在播放");
             author.setText("");
@@ -217,6 +288,16 @@ public class PlayerActivity extends Activity {
             hint.setText(status);
         } else {
             hint.setText(t.hasLocal() ? "已缓存" : "在线播放");
+        }
+        // Reconcile cache button (e.g. re-open player while downloading)
+        if (cur != null && cur.hasLocal()) {
+            updateCacheBtn(1, 100, 0);
+        } else if (cur != null && Downloader.busy(cur.id)) {
+            int[] p = Downloader.progress(cur.id);
+            if (p != null) updateCacheBtn(0, p[0], p[1]);
+            else updateCacheBtn(3, 0, 0);
+        } else {
+            resetCacheBtn();
         }
         App.postBg(new Runnable() {
             @Override
@@ -355,6 +436,211 @@ public class PlayerActivity extends Activity {
         });
     }
 
+    /* ---------------- volume (vertical bar: display + control) ---------------- */
+
+    private void initVolume() {
+        am = (AudioManager) getSystemService(AUDIO_SERVICE);
+        if (am != null) {
+            volMax = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+            if (volMax <= 0) volMax = 1;
+            syncVolume(am.getStreamVolume(AudioManager.STREAM_MUSIC));
+        }
+        if (volBar != null) {
+            volBar.setOnVolumeChangeListener(new VolumeBar.OnVolumeChangeListener() {
+                @Override
+                public void onVolume(float level) {
+                    if (am == null) return;
+                    int v = Math.round(level * volMax);
+                    if (v < 0) v = 0;
+                    if (v > volMax) v = volMax;
+                    am.setStreamVolume(AudioManager.STREAM_MUSIC, v, 0);
+                    syncVolume(v);
+                }
+            });
+        }
+    }
+
+    private void syncVolume(int v) {
+        if (volBar != null && volMax > 0) volBar.setLevel((float) v / volMax);
+        if (volPct != null) volPct.setText(v + "/" + volMax);
+    }
+
+    /** Keep the bar in sync with hardware-key / system volume changes. */
+    private void syncVolumeFromSystem() {
+        if (am == null) return;
+        syncVolume(am.getStreamVolume(AudioManager.STREAM_MUSIC));
+    }
+
+    /* ---------------- lyrics ---------------- */
+
+    private void toggleLyricPanel() {
+        if (lyricPanel == null) return;
+        if (lyricPanel.getVisibility() == View.VISIBLE) {
+            lyricPanel.setVisibility(View.GONE);
+            return;
+        }
+        lyricPanel.setVisibility(View.VISIBLE);
+        if (lyricQuery != null) {
+            String curQ = lyricQuery.getText() == null ? "" : lyricQuery.getText().toString().trim();
+            if (curQ.isEmpty() && cur != null) {
+                String q = NeteaseLyric.cleanQuery(cur.title);
+                lyricQuery.setText(q.isEmpty() ? cur.title : q);
+            }
+        }
+        if (lyric != null) {
+            renderLyric(lyric);
+        } else if (cur != null && !cur.id.equals(lastLyricKey)) {
+            fetchLyricFor(cur);
+        } else if (lyricStatus != null) {
+            lyricStatus.setText(getString(R.string.lyric_loading));
+        }
+    }
+
+    /** Auto-search lyrics for a track (cached by track id, runs on a bg thread). */
+    private void fetchLyricFor(final Track t) {
+        if (t == null) return;
+        lastLyricKey = t.id;
+        lastLyricIdx = -1;
+        lyric = null;
+        String q = NeteaseLyric.cleanQuery(t.title);
+        if (q.isEmpty()) q = t.title;
+        if (lyricQuery != null) lyricQuery.setText(q);
+        if (lyricLines != null) lyricLines.removeAllViews();
+        if (lyricStatus != null && lyricPanel != null
+                && lyricPanel.getVisibility() == View.VISIBLE) {
+            lyricStatus.setText(getString(R.string.lyric_loading));
+        }
+        NeteaseLyric.getLyric(this, t.id, q, new NeteaseLyric.LyricCallback() {
+            @Override
+            public void onLyric(Lyric ly, boolean fromCache) {
+                if (cur == null || t == null || !t.id.equals(cur.id)) return;
+                lyric = ly;
+                if (lyricPanel != null && lyricPanel.getVisibility() == View.VISIBLE) {
+                    renderLyric(ly);
+                }
+            }
+
+            @Override
+            public void onError(String msg) {
+                if (lyricStatus != null && lyricPanel != null
+                        && lyricPanel.getVisibility() == View.VISIBLE) {
+                    lyricStatus.setText(getString(R.string.lyric_not_found) + "：" + msg);
+                }
+            }
+        });
+    }
+
+    private void renderLyric(Lyric ly) {
+        if (lyricLines == null) return;
+        lyricLines.removeAllViews();
+        if (ly != null) {
+            for (Lyric.Line l : ly.lines) {
+                TextView tv = new TextView(PlayerActivity.this);
+                tv.setText(l.text);
+                tv.setTextColor(getResources().getColor(R.color.text_sub));
+                tv.setTextSize(15);
+                tv.setGravity(Gravity.CENTER);
+                tv.setPadding(8, 10, 8, 10);
+                lyricLines.addView(tv);
+            }
+        }
+        lastLyricIdx = -1;
+        if (lyricStatus != null) {
+            lyricStatus.setText(ly == null || ly.lines.isEmpty()
+                        ? getString(R.string.lyric_not_found) : "");
+        }
+        updateLyricHighlight();
+    }
+
+    /** Highlight + auto-scroll the line matching the current playback position. */
+    private void updateLyricHighlight() {
+        if (lyric == null || lyricLines == null || lyricScroll == null) return;
+        if (lyricPanel == null || lyricPanel.getVisibility() != View.VISIBLE) return;
+        int n = lyricLines.getChildCount();
+        if (n == 0) return;
+        PlaybackService svc = PlaybackService.get();
+        long pos = svc != null ? svc.position() : 0;
+        int idx = lyric.indexAt(pos);
+        if (idx == lastLyricIdx) return;
+        if (lastLyricIdx >= 0 && lastLyricIdx < n) {
+            TextView old = (TextView) lyricLines.getChildAt(lastLyricIdx);
+            old.setTextColor(getResources().getColor(R.color.text_sub));
+            old.setTextSize(15);
+        }
+        if (idx >= 0 && idx < n) {
+            TextView nv = (TextView) lyricLines.getChildAt(idx);
+            nv.setTextColor(getResources().getColor(R.color.accent));
+            nv.setTextSize(17);
+            final int top = nv.getTop();
+            final int off = lyricScroll.getHeight() / 3;
+            lyricScroll.post(new Runnable() {
+                @Override
+                public void run() {
+                    lyricScroll.smoothScrollTo(0, Math.max(0, top - off));
+                }
+            });
+        }
+        lastLyricIdx = idx;
+    }
+
+    /** Manual lyrics search: search by keyword, then pick a candidate. */
+    private void manualSearch() {
+        if (lyricQuery == null) return;
+        String q = lyricQuery.getText() == null ? "" : lyricQuery.getText().toString().trim();
+        if (q.isEmpty() && cur != null) {
+            q = NeteaseLyric.cleanQuery(cur.title);
+            if (q.isEmpty()) q = cur.title;
+        }
+        if (q.isEmpty()) return;
+        if (lyricStatus != null) lyricStatus.setText(getString(R.string.lyric_loading));
+        NeteaseLyric.search(q, new NeteaseLyric.SearchCallback() {
+            @Override
+            public void onSongs(final List<NeteaseLyric.Song> songs) {
+                CharSequence[] names = new CharSequence[songs.size()];
+                for (int i = 0; i < songs.size(); i++) {
+                    NeteaseLyric.Song s = songs.get(i);
+                    names[i] = s.name + (s.artist == null || s.artist.isEmpty() ? "" : " - " + s.artist);
+                }
+                new AlertDialog.Builder(PlayerActivity.this)
+                        .setTitle(R.string.lyrics)
+                        .setItems(names, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int w) {
+                                NeteaseLyric.Song s = songs.get(w);
+                                if (lyricStatus != null) {
+                                    lyricStatus.setText(getString(R.string.lyric_loading));
+                                }
+                                NeteaseLyric.lyricById(PlayerActivity.this,
+                                        (cur != null ? cur.id : "man") + "_" + s.id, s.id,
+                                        new NeteaseLyric.LyricCallback() {
+                                            @Override
+                                            public void onLyric(Lyric ly, boolean fromCache) {
+                                                lyric = ly;
+                                                renderLyric(ly);
+                                            }
+
+                                            @Override
+                                            public void onError(String msg) {
+                                                if (lyricStatus != null) {
+                                                    lyricStatus.setText(
+                                                            getString(R.string.lyric_not_found)
+                                                                    + "：" + msg);
+                                                }
+                                            }
+                                        });
+                            }
+                        }).show();
+            }
+
+            @Override
+            public void onError(String msg) {
+                if (lyricStatus != null) {
+                    lyricStatus.setText(getString(R.string.lyric_not_found) + "：" + msg);
+                }
+            }
+        });
+    }
+
     private void updateProgress() {
         PlaybackService svc = PlaybackService.get();
         if (svc == null) return;
@@ -377,6 +663,68 @@ public class PlayerActivity extends Activity {
                 hint.setText((cur.hasLocal() ? "已缓存 · " : "在线播放 · ") + mode);
             }
         }
+        syncVolumeFromSystem();
+        updateLyricHighlight();
+    }
+
+    /** Update the cache button to reflect download state + progress + speed. */
+    private void updateCacheBtn(int state, int pct, long speed) {
+        if (btnCache == null) return;
+        switch (state) {
+            case 1: // done / already cached
+                btnCache.setText("已缓存 ✓");
+                btnCache.setTextColor(getResources().getColor(R.color.accent));
+                btnCache.setBackgroundResource(R.drawable.ripple_round);
+                break;
+            case 2: // failed
+                btnCache.setText("缓存失败 · 点击重试");
+                btnCache.setTextColor(getResources().getColor(R.color.pink));
+                btnCache.setBackgroundResource(R.drawable.ripple_round);
+                break;
+            case 3: // waiting / preparing
+                btnCache.setText("准备缓存…");
+                btnCache.setTextColor(getResources().getColor(R.color.accent));
+                btnCache.setBackgroundResource(R.drawable.ripple_round);
+                break;
+            default: // 0 = downloading
+                btnCache.setText("缓存中 " + pct + "%  ·  " + fmtSpeed(speed));
+                btnCache.setTextColor(getResources().getColor(android.R.color.white));
+                btnCache.setBackground(makeCacheBg(pct));
+                break;
+        }
+    }
+
+    /** Reset the cache button to its idle "cache to local" state. */
+    private void resetCacheBtn() {
+        if (btnCache == null) return;
+        btnCache.setText("缓存到本地");
+        btnCache.setTextColor(getResources().getColor(R.color.text_sub));
+        btnCache.setBackgroundResource(R.drawable.ripple_round);
+    }
+
+    /** Rounded progress fill used as the cache button background while downloading. */
+    private Drawable makeCacheBg(int pct) {
+        int accent = getResources().getColor(R.color.accent);
+        int r = (accent >> 16) & 0xff, g = (accent >> 8) & 0xff, b = accent & 0xff;
+        float d = getResources().getDisplayMetrics().density;
+        GradientDrawable base = new GradientDrawable();
+        base.setColor(Color.argb(60, r, g, b));
+        base.setCornerRadius(19 * d);
+        GradientDrawable fill = new GradientDrawable();
+        fill.setColor(accent);
+        fill.setCornerRadius(19 * d);
+        ClipDrawable clip = new ClipDrawable(fill, Gravity.LEFT, ClipDrawable.HORIZONTAL);
+        clip.setLevel(Math.max(1, pct) * 100);
+        return new LayerDrawable(new Drawable[]{base, clip});
+    }
+
+    private static String fmtSpeed(long bps) {
+        if (bps <= 0) return "0 KB/s";
+        if (bps >= 1024 * 1024) {
+            return String.format(java.util.Locale.US, "%.2f MB/s", bps / 1048576.0);
+        }
+        if (bps >= 1024) return (bps / 1024) + " KB/s";
+        return bps + " B/s";
     }
 
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
@@ -399,14 +747,23 @@ public class PlayerActivity extends Activity {
             } else if (Downloader.ACT_DL.equals(a)) {
                 if (cur != null && cur.id.equals(i.getStringExtra(Downloader.EXTRA_ID))) {
                     int st = i.getIntExtra(Downloader.EXTRA_STATE, 0);
+                    int pct = i.getIntExtra(Downloader.EXTRA_PROGRESS, 0);
+                    long spd = i.getLongExtra(Downloader.EXTRA_SPEED, 0);
                     if (st == 1) {
                         cur.cached = true;
                         cur.path = com.volcano.bmusic.util.Cache.audioFile(PlayerActivity.this, cur)
                                 .getAbsolutePath();
+                        updateCacheBtn(1, 100, 0);
                         Toast.makeText(PlayerActivity.this, "缓存完成", Toast.LENGTH_SHORT).show();
                         refresh();
-                    } else {
-                        hint.setText("缓存中 " + i.getIntExtra(Downloader.EXTRA_PROGRESS, 0) + "%");
+                    } else if (st == 0) {
+                        updateCacheBtn(0, pct, spd);
+                    } else if (st == 2) {
+                        updateCacheBtn(2, 0, 0);
+                        String msg = i.getStringExtra("msg");
+                        hint.setText("缓存失败" + (msg != null ? "：" + msg : ""));
+                    } else if (st == 3) {
+                        updateCacheBtn(3, 0, 0);
                     }
                 }
             }

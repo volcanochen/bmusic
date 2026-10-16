@@ -46,7 +46,8 @@ find "$SRC" "$GEN" -name "*.java" > "$OUT/sources.txt"
 "$JAVAC" -encoding UTF-8 -nowarn \
   -source 8 -target 8 \
   -bootclasspath "$PL" -classpath "$PL" \
-  -d "$OBJ" @"$OUT/sources.txt" 2>&1 | head -60
+  -d "$OBJ" @"$OUT/sources.txt" 2>"$OUT/javac.log" \
+  || { echo "JAVAC FAILED"; cat "$OUT/javac.log"; exit 1; }
 
 echo "== 4/7 dex =="
 rm -rf "$BIN"; mkdir -p "$BIN"
