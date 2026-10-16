@@ -114,6 +114,10 @@ public final class Bili {
     /**
      * Resolve one user input (link / share text / bvid / av id) into a Ref.
      * Performs network requests for short b23.tv links.
+     *
+     * The {@code p} index of the shared link survives the whole redirect chain:
+     * every hop is followed by hand, so the {@code ?p=} of the real video url is
+     * never dropped (a b23.tv link carries no {@code p}, its destination does).
      */
     public static Ref resolve(String input) throws Exception {
         Ref direct = quickRef(input);
@@ -128,28 +132,64 @@ public final class Bili {
         for (int hop = 0; hop < 6; hop++) {
             Ref maybe = quickRef(finalUrl);
             if (maybe != null) return maybe;
-            Http.Resp r = Http.follow(finalUrl, Http.baseHeaders());
+            // get(), not follow(): HttpURLConnection would swallow the Location of
+            // every hop and the ?p= of the destination url would be lost.
+            Http.Resp r = Http.get(finalUrl, Http.baseHeaders());
             String loc = (r.location != null && !r.location.isEmpty()) ? r.location : null;
             if (loc == null && r.body != null) {
                 Matcher m = P_BV.matcher(r.body);
                 if (m.find()) {
                     Ref rr = new Ref();
                     rr.bvid = m.group(1);
-                    Matcher pm = P_PAGE.matcher(finalUrl);
-                    if (pm.find()) rr.page = Integer.parseInt(pm.group(1));
+                    rr.page = pageOf(finalUrl, r.body);
                     return rr;
                 }
                 Matcher am = P_AV.matcher(r.body);
                 if (am.find()) {
                     Ref rr = new Ref();
-                    rr.aid = Long.parseLong(am.group(1));
+                    try {
+                        rr.aid = Long.parseLong(am.group(1));
+                    } catch (Exception ignored) {
+                        break;
+                    }
+                    rr.page = pageOf(finalUrl, r.body);
                     return rr;
                 }
             }
             if (loc == null) break;
-            finalUrl = loc;
+            finalUrl = absolutize(loc, finalUrl);
         }
         throw new ApiException(-1, "无法解析该链接：" + input);
+    }
+
+    /** {@code ?p=} index found in the url, falling back to the page body. */
+    private static int pageOf(String url, String body) {
+        int p = 1;
+        if (url != null) {
+            Matcher m = P_PAGE.matcher(url);
+            if (m.find()) p = parseInt(m.group(1), 1);
+        }
+        if (p == 1 && body != null) {
+            Matcher m = P_PAGE.matcher(body);
+            if (m.find()) p = parseInt(m.group(1), 1);
+        }
+        return p < 1 ? 1 : p;
+    }
+
+    private static int parseInt(String s, int def) {
+        try {
+            return Integer.parseInt(s);
+        } catch (Exception e) {
+            return def;
+        }
+    }
+
+    private static String absolutize(String loc, String base) {
+        try {
+            return new java.net.URL(new java.net.URL(base), loc).toString();
+        } catch (Exception e) {
+            return loc;
+        }
     }
 
     // ----------------------------------------------------------- http helpers
@@ -322,8 +362,8 @@ public final class Bili {
 
     // ---------------------------------------------------------------- api
 
-    /** Fetch full metadata for one Ref (network). */
-    public static Track fetch(Ref ref) throws Exception {
+    /** Raw "data" object of the view api for this ref (one network call). */
+    public static JSONObject view(Ref ref) throws Exception {
         ensureSession();
         Map<String, String> p = new HashMap<String, String>();
         if (ref.bvid != null && ref.bvid.length() > 0) {
@@ -332,10 +372,34 @@ public final class Bili {
             p.put("aid", String.valueOf(ref.aid));
         }
         JSONObject jo = call("https://api.bilibili.com/x/web-interface/view", p);
-        JSONObject data = jo.getJSONObject("data");
+        return jo.getJSONObject("data");
+    }
+
+    /** How many parts (P) the video has. 1 when the api reports none. */
+    public static int pageCount(JSONObject data) {
+        if (data == null) return 1;
+        JSONArray pages = data.optJSONArray("pages");
+        return (pages == null || pages.length() == 0) ? 1 : pages.length();
+    }
+
+    /** Fetch full metadata for one Ref (network). */
+    public static Track fetch(Ref ref) throws Exception {
+        return buildTrack(view(ref), ref);
+    }
+
+    /**
+     * Build the Track of {@code ref.page} out of an already fetched view data
+     * object. Lets the caller import every part of a multi-part video without
+     * re-querying the view api for each part.
+     */
+    public static Track fetch(Ref ref, JSONObject data) throws Exception {
+        return buildTrack(data, ref);
+    }
+
+    private static Track buildTrack(JSONObject data, Ref ref) throws Exception {
         String bvid = data.optString("bvid");
-        String ownerName = data.optJSONObject("owner") != null
-                ? data.optJSONObject("owner").optString("name") : "";
+        JSONObject owner = data.optJSONObject("owner");
+        String ownerName = owner != null ? owner.optString("name") : "";
         String pic = data.optString("pic");
         String title = data.optString("title");
         long totalSec = data.optLong("duration", 0);

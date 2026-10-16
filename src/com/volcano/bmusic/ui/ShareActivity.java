@@ -13,6 +13,7 @@ import com.volcano.bmusic.api.Importer;
 import com.volcano.bmusic.db.Db;
 import com.volcano.bmusic.model.Track;
 import com.volcano.bmusic.player.PlaybackService;
+import com.volcano.bmusic.util.PartAsk;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,7 +40,12 @@ public class ShareActivity extends Activity {
                         final AlertDialog wait = new AlertDialog.Builder(ShareActivity.this)
                                 .setMessage("正在解析...")
                                 .setCancelable(false).show();
-                        Importer.add(ShareActivity.this, text, new Importer.Callback() {
+                        Importer.add(ShareActivity.this, text, new Importer.Chooser() {
+                            @Override
+                            public boolean askAll(Importer.Candidate cand) {
+                                return PartAsk.allOrCurrent(ShareActivity.this, cand);
+                            }
+                        }, new Importer.Callback() {
                             @Override
                             public void done(List<Track> added, String failMsg) {
                                 try {

@@ -9,6 +9,8 @@ import com.volcano.bmusic.App;
 import com.volcano.bmusic.db.Db;
 import com.volcano.bmusic.model.Track;
 
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -19,11 +21,39 @@ public final class Importer {
 
     public static final String ACT_ADDED = "com.volcano.bmusic.ADDED";
 
+    /** One resolved video, waiting for the user's multi-part decision. */
+    public static class Candidate {
+        public String bvid;
+        public long aid;
+        /** part the shared link pointed at */
+        public int page = 1;
+        /** total parts of the video */
+        public int pageCount = 1;
+        public String title = "";
+        public String author = "";
+        public String cover = "";
+    }
+
     public interface Callback {
         void done(List<Track> added, String failMsg);
     }
 
+    /**
+     * Asked when a shared video has more than one part.
+     * Runs on a background thread, so the implementation is expected to show
+     * something on the ui thread and block until the user answered.
+     *
+     * @return true to add every part, false for only the shared part
+     */
+    public interface Chooser {
+        boolean askAll(Candidate cand);
+    }
+
     public static void add(final Context c, final String text, final Callback cb) {
+        add(c, text, null, cb);
+    }
+
+    public static void add(final Context c, final String text, final Chooser chooser, final Callback cb) {
         App.postNet(new Runnable() {
             @Override
             public void run() {
@@ -41,13 +71,33 @@ public final class Importer {
                     }
                     for (Bili.Ref r : refs) {
                         try {
-                            Track t = Bili.fetch(r);
-                            if (t == null || TextUtils.isEmpty(t.id)) continue;
-                            if (seen.contains(t.id)) continue;
-                            seen.add(t.id);
-                            t.added = System.currentTimeMillis();
-                            Db.get(c).upsert(t);
-                            added.add(t);
+                            // one view call per video, reused for every part
+                            JSONObject data = Bili.view(r);
+                            int pc = Bili.pageCount(data);
+                            List<Bili.Ref> targets = new ArrayList<Bili.Ref>();
+                            if (pc > 1 && chooser != null) {
+                                boolean all = chooser.askAll(candidate(data, r, pc));
+                                if (all) {
+                                    for (int i = 1; i <= pc; i++) targets.add(withPage(r, i));
+                                } else {
+                                    targets.add(r);
+                                }
+                            } else {
+                                targets.add(r);
+                            }
+                            for (Bili.Ref tr : targets) {
+                                try {
+                                    Track t = Bili.fetch(tr, data);
+                                    if (t == null || TextUtils.isEmpty(t.id)) continue;
+                                    if (seen.contains(t.id)) continue;
+                                    seen.add(t.id);
+                                    t.added = System.currentTimeMillis();
+                                    Db.get(c).upsert(t);
+                                    added.add(t);
+                                } catch (Exception e) {
+                                    if (fail == null) fail = e.getMessage();
+                                }
+                            }
                         } catch (Exception e) {
                             if (fail == null) fail = e.getMessage();
                         }
@@ -55,9 +105,9 @@ public final class Importer {
                 } catch (Exception e) {
                     if (fail == null) fail = e.getMessage();
                 }
-        Intent i = new Intent(ACT_ADDED);
-        i.setPackage(c.getPackageName());
-        i.putExtra("n", added.size());
+                Intent i = new Intent(ACT_ADDED);
+                i.setPackage(c.getPackageName());
+                i.putExtra("n", added.size());
                 c.sendBroadcast(i);
                 if (cb != null) {
                     final String f = fail;
@@ -70,6 +120,27 @@ public final class Importer {
                 }
             }
         });
+    }
+
+    private static Candidate candidate(JSONObject data, Bili.Ref r, int pageCount) {
+        Candidate cd = new Candidate();
+        cd.bvid = (r.bvid != null && r.bvid.length() > 0) ? r.bvid : data.optString("bvid");
+        cd.aid = r.aid;
+        cd.page = r.page < 1 ? 1 : r.page;
+        cd.pageCount = pageCount;
+        cd.title = data.optString("title");
+        JSONObject owner = data.optJSONObject("owner");
+        cd.author = owner != null ? owner.optString("name") : "";
+        cd.cover = data.optString("pic");
+        return cd;
+    }
+
+    private static Bili.Ref withPage(Bili.Ref r, int page) {
+        Bili.Ref n = new Bili.Ref();
+        n.bvid = r.bvid;
+        n.aid = r.aid;
+        n.page = page;
+        return n;
     }
 
     public static void toastResult(Context c, List<Track> added, String fail) {

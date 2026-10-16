@@ -46,6 +46,7 @@ import com.volcano.bmusic.util.Cache;
 import com.volcano.bmusic.util.CoverLoader;
 import com.volcano.bmusic.util.Downloader;
 import com.volcano.bmusic.util.Notify;
+import com.volcano.bmusic.util.PartAsk;
 import com.volcano.bmusic.util.Receivers;
 
 import java.util.ArrayList;
@@ -518,7 +519,12 @@ public class MainActivity extends Activity {
         final AlertDialog wait = new AlertDialog.Builder(this)
                 .setMessage("正在解析...")
                 .setCancelable(false).show();
-        Importer.add(this, text, new Importer.Callback() {
+        Importer.add(this, text, new Importer.Chooser() {
+            @Override
+            public boolean askAll(Importer.Candidate cand) {
+                return PartAsk.allOrCurrent(MainActivity.this, cand);
+            }
+        }, new Importer.Callback() {
             @Override
             public void done(List<Track> added, String failMsg) {
                 try {
