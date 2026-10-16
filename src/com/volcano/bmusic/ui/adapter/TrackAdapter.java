@@ -87,6 +87,7 @@ public class TrackAdapter extends BaseAdapter {
             v = LayoutInflater.from(ctx).inflate(R.layout.item_track, parent, false);
             h = new Holder();
             h.art = (ImageView) v.findViewById(R.id.art);
+            h.now = (ImageView) v.findViewById(R.id.now);
             h.title = (TextView) v.findViewById(R.id.title);
             h.sub = (TextView) v.findViewById(R.id.sub);
             h.dur = (TextView) v.findViewById(R.id.dur);
@@ -108,6 +109,7 @@ public class TrackAdapter extends BaseAdapter {
         }
         h.badge.setVisibility(t.hasLocal() ? View.VISIBLE : View.GONE);
         boolean isCur = t.id != null && t.id.equals(playingId);
+        if (h.now != null) h.now.setVisibility(isCur ? View.VISIBLE : View.GONE);
         h.title.setTextColor(ctx.getResources().getColor(
                 isCur ? R.color.pink : R.color.text));
         h.sub.setTextColor(ctx.getResources().getColor(
@@ -141,6 +143,7 @@ public class TrackAdapter extends BaseAdapter {
 
     private static class Holder {
         ImageView art;
+        ImageView now;
         TextView title;
         TextView sub;
         TextView dur;

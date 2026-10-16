@@ -18,18 +18,23 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.Editable;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.TextWatcher;
+import android.text.style.ForegroundColorSpan;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.AdapterView;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.PopupWindow;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -68,10 +73,21 @@ public class MainActivity extends Activity {
     private TextView emptyRecent;
     private TextView tvCache;
     private View mini;
+    private View miniWrap;
+    private View miniProg;
+    private ProgressBar miniLoad;
+    private Button btnPlayFilter;
     private ImageView miniArt;
     private TextView miniTitle;
     private TextView miniSub;
     private ImageButton miniPlay;
+
+    // last values shown on the mini bar, so we know when something changed and
+    // the change deserves an animation
+    private String miniId;
+    private String miniSubText;
+    private Boolean miniPlaying;
+    private String miniError;
     private View pageTracks;
     private View pagePlaylists;
     private View pageMe;
@@ -179,6 +195,10 @@ public class MainActivity extends Activity {
         pagePlaylists = findViewById(R.id.page_playlists);
         pageMe = findViewById(R.id.page_me);
         mini = findViewById(R.id.mini);
+        miniWrap = findViewById(R.id.mini_wrap);
+        miniProg = findViewById(R.id.mini_prog);
+        miniLoad = (ProgressBar) findViewById(R.id.mini_load);
+        btnPlayFilter = (Button) findViewById(R.id.btn_play_filter);
         miniArt = (ImageView) findViewById(R.id.mini_art);
         miniTitle = (TextView) findViewById(R.id.mini_title);
         miniSub = (TextView) findViewById(R.id.mini_sub);
@@ -326,6 +346,14 @@ public class MainActivity extends Activity {
                 showAddDialog();
             }
         });
+        if (btnPlayFilter != null) {
+            btnPlayFilter.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    playFiltered();
+                }
+            });
+        }
         findViewById(R.id.btn_new_pl).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -425,6 +453,10 @@ public class MainActivity extends Activity {
                     public void run() {
                         trackAdapter.setData(all);
                         emptyTracks.setVisibility(all.isEmpty() ? View.VISIBLE : View.GONE);
+                        if (btnPlayFilter != null) {
+                            btnPlayFilter.setText(all.isEmpty()
+                                    ? "播放全部" : "播放 " + all.size() + " 首");
+                        }
                         Track cur = currentTrack();
                         if (cur != null) trackAdapter.setPlaying(cur.id, isPlaying());
                     }
@@ -502,21 +534,154 @@ public class MainActivity extends Activity {
         return s != null && s.isPlaying();
     }
 
+    /**
+     * Repaint the mini bar. Every event the user should notice — a new track,
+     * play/pause, buffering, an error — gets an animation instead of an
+     * instant silent swap.
+     */
     private void refreshMini() {
         Track t = currentTrack();
         if (t == null) {
-            mini.setVisibility(View.GONE);
+            if (miniWrap != null) miniWrap.setVisibility(View.GONE);
+            miniId = null;
+            miniSubText = null;
+            miniPlaying = null;
             return;
         }
-        mini.setVisibility(View.VISIBLE);
-        miniTitle.setText(t.title);
-        miniSub.setText(t.author);
+        PlaybackService s = svc();
         boolean playing = isPlaying();
-        miniPlay.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play);
-        miniArt.setImageResource(R.drawable.ic_music_note);
-        CoverLoader.get(this).load(miniArt, t.cover);
+        boolean loading = s != null && s.isLoading();
+
+        String state;
+        int stateColor;
+        if (miniError != null) {
+            state = "播放失败";
+            stateColor = R.color.pink;
+        } else if (loading) {
+            state = "缓冲中…";
+            stateColor = R.color.orange;
+        } else if (playing) {
+            state = "播放中";
+            stateColor = R.color.pink;
+        } else {
+            state = "已暂停";
+            stateColor = R.color.text_dim;
+        }
+
+        // first appearance: slide + fade the whole bar in
+        if (miniWrap.getVisibility() != View.VISIBLE) {
+            miniWrap.setVisibility(View.VISIBLE);
+            float d = getResources().getDisplayMetrics().density;
+            if (d <= 0f) d = 1f;
+            miniWrap.setAlpha(0f);
+            miniWrap.setTranslationY(26f * d);
+            miniWrap.animate().alpha(1f).translationY(0f).setDuration(280).start();
+            miniId = null;
+            miniSubText = null;
+            miniPlaying = null;
+        }
+
+        // new track: swap the title with a cross-fade and pulse the cover
+        if (!t.id.equals(miniId)) {
+            miniId = t.id;
+            swapText(miniTitle, t.title == null ? "" : t.title);
+            pulse(miniArt);
+            flashMini();
+            miniArt.setImageResource(R.drawable.ic_music_note);
+            CoverLoader.get(this).load(miniArt, t.cover);
+        }
+
+        // status line: "UP主 · 播放中" with the status part highlighted
+        String sub = t.author == null ? "" : t.author;
+        if (sub.length() > 0) sub += " · ";
+        sub += state;
+        if (!sub.equals(miniSubText)) {
+            miniSubText = sub;
+            swapText(miniSub, colored(sub, state, stateColor));
+        }
+
+        // play / pause: change the icon and pulse it
+        if (miniPlaying == null || miniPlaying.booleanValue() != playing) {
+            miniPlay.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play);
+            if (miniPlaying != null) pulse(miniPlay);
+            miniPlaying = Boolean.valueOf(playing);
+        }
+        if (miniLoad != null) {
+            miniLoad.setVisibility(loading ? View.VISIBLE : View.GONE);
+        }
+        if (s != null) updateMiniProgress(s.position(), s.duration());
         trackAdapter.setPlaying(t.id, playing);
         recentAdapter.setPlaying(t.id, playing);
+    }
+
+    /** Cross-fade + slide a text change, so the swap is easy to notice. */
+    private void swapText(final TextView tv, final CharSequence next) {
+        if (tv.getText() != null && tv.getText().toString().equals(next.toString())) {
+            tv.setText(next);
+            return;
+        }
+        tv.animate().cancel();
+        tv.animate().alpha(0.1f).translationY(-6f).setDuration(110)
+                .withEndAction(new Runnable() {
+                    @Override
+                    public void run() {
+                        tv.setText(next);
+                        tv.setTranslationY(7f);
+                        tv.animate().alpha(1f).translationY(0f).setDuration(200).start();
+                    }
+                }).start();
+    }
+
+    /** Colour just the trailing status word of the mini subtitle. */
+    private CharSequence colored(String whole, String tail, int colorRes) {
+        SpannableString ss = new SpannableString(whole);
+        int at = whole.lastIndexOf(tail);
+        if (at >= 0) {
+            ss.setSpan(new ForegroundColorSpan(getResources().getColor(colorRes)),
+                    at, whole.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return ss;
+    }
+
+    /** Short scale bounce, used for the play button and the cover art. */
+    private void pulse(final View v) {
+        if (v == null) return;
+        v.animate().cancel();
+        v.animate().scaleX(1.22f).scaleY(1.22f).setDuration(110)
+                .withEndAction(new Runnable() {
+                    @Override
+                    public void run() {
+                        v.animate().scaleX(1f).scaleY(1f).setDuration(160).start();
+                    }
+                }).start();
+    }
+
+    /** Brief dim-then-bright flash of the whole bar when the track changes. */
+    private void flashMini() {
+        if (mini == null) return;
+        mini.setAlpha(0.45f);
+        mini.animate().alpha(1f).setDuration(340).start();
+    }
+
+    /** Thin progress line along the bottom edge of the mini bar. */
+    private void updateMiniProgress(int pos, int dur) {
+        if (miniProg == null || miniWrap == null) return;
+        int w = miniWrap.getWidth();
+        if (w <= 0 || dur <= 0) {
+            setWidth(miniProg, 0);
+            return;
+        }
+        int pw = (int) ((long) w * pos / dur);
+        if (pw < 0) pw = 0;
+        if (pw > w) pw = w;
+        setWidth(miniProg, pw);
+    }
+
+    private static void setWidth(View v, int px) {
+        ViewGroup.LayoutParams lp = v.getLayoutParams();
+        if (lp == null) return;
+        lp.width = px;
+        v.setLayoutParams(lp);
     }
 
     // --------------------------------------------------------------- import
@@ -598,87 +763,37 @@ public class MainActivity extends Activity {
     // -------------------------------------------------------------- menus
 
     private void showTrackMenu(View anchor, final Track t) {
-        final String[] items = {"立即播放", "加入播放队列", "缓存到本地", "加入歌单", "删除曲目"};
-        new AlertDialog.Builder(this)
-                .setTitle(t.title)
-                .setItems(items, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        switch (which) {
-                            case 0:
-                                PlaybackService.open(MainActivity.this, t.id);
-                                handler.postDelayed(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        refreshMini();
-                                    }
-                                }, 300);
-                                break;
-                            case 1:
-                                PlaybackService.append(MainActivity.this, t.id);
-                                Toast.makeText(MainActivity.this, "已加入队列", Toast.LENGTH_SHORT).show();
-                                break;
-                            case 2:
-                                Downloader.start(MainActivity.this, t);
-                                Toast.makeText(MainActivity.this, "开始缓存", Toast.LENGTH_SHORT).show();
-                                break;
-                            case 3:
-                                choosePlaylist(t);
-                                break;
-                            case 4:
-                                confirmDelete(t);
-                                break;
-                        }
-                    }
-                }).show();
-    }
-
-    private void choosePlaylist(final Track t) {
-        App.postBg(new Runnable() {
+        TrackActions.showMenu(this, t, TrackActions.LIBRARY_ITEMS, new TrackActions.ItemHandler() {
             @Override
-            public void run() {
-                final List<Playlist> pls = Db.get(MainActivity.this).playlists();
-                App.runOnUi(new Runnable() {
-                    @Override
-                    public void run() {
-                        CharSequence[] names = new CharSequence[pls.size() + 1];
-                        for (int i = 0; i < pls.size(); i++) names[i] = pls.get(i).name;
-                        names[pls.size()] = "新建歌单...";
-                        new AlertDialog.Builder(MainActivity.this)
-                                .setTitle("加入歌单")
-                                .setItems(names, new DialogInterface.OnClickListener() {
-                                    @Override
-                                    public void onClick(DialogInterface d, int w) {
-                                        if (w >= pls.size()) {
-                                            showNewPlaylistDialogWith(t);
-                                        } else {
-                                            App.postBg(new Runnable() {
-                                                @Override
-                                                public void run() {
-                                                }
-                                            });
-                                            addToPlaylist(pls.get(w), t);
-                                        }
-                                    }
-                                }).show();
-                    }
-                });
-            }
-        });
-    }
-
-    private void addToPlaylist(final Playlist p, final Track t) {
-        App.postBg(new Runnable() {
-            @Override
-            public void run() {
-                Db.get(MainActivity.this).addTo(p.id, t.id);
-                App.runOnUi(new Runnable() {
-                    @Override
-                    public void run() {
-                        Toast.makeText(MainActivity.this, "已加入「" + p.name + "」", Toast.LENGTH_SHORT).show();
-                        reloadPlaylists();
-                    }
-                });
+            public void onItem(Track track, int which) {
+                switch (which) {
+                    case 0:
+                        TrackActions.playNow(MainActivity.this, track);
+                        handler.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                refreshMini();
+                            }
+                        }, 400);
+                        break;
+                    case 1:
+                        TrackActions.enqueue(MainActivity.this, track);
+                        break;
+                    case 2:
+                        TrackActions.cache(MainActivity.this, track);
+                        break;
+                    case 3:
+                        TrackActions.addToPlaylist(MainActivity.this, track);
+                        break;
+                    case 4:
+                        TrackActions.confirmDelete(MainActivity.this, track, new Runnable() {
+                            @Override
+                            public void run() {
+                                reloadAll();
+                            }
+                        });
+                        break;
+                }
             }
         });
     }
@@ -790,28 +905,45 @@ public class MainActivity extends Activity {
                 }).setNegativeButton("取消", null).show();
     }
 
-    private void confirmDelete(final Track t) {
-        new AlertDialog.Builder(this)
-                .setMessage("从曲库删除「" + t.title + "」？")
-                .setPositiveButton("删除", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int w) {
-                        App.postBg(new Runnable() {
-                            @Override
-                            public void run() {
-                                java.io.File f = new java.io.File(t.path == null ? "" : t.path);
-                                if (t.hasLocal() && f.exists()) f.delete();
-                                Db.get(MainActivity.this).deleteTrack(t.id);
-                                App.runOnUi(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        reloadAll();
-                                    }
-                                });
-                            }
-                        });
-                    }
-                }).setNegativeButton("取消", null).show();
+    /**
+     * 曲库播放选项：把当前筛选范围里的全部曲目导入播放队列并播放。
+     * 若正在播放的曲目就在筛选结果里，就接着播这首，不打断；否则从第一首开始。
+     */
+    private void playFiltered() {
+        ArrayList<Track> list = new ArrayList<Track>(trackAdapter.data());
+        if (list.isEmpty()) {
+            Toast.makeText(this, "没有可播放的曲目", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ArrayList<String> ids = new ArrayList<String>();
+        for (Track t : list) ids.add(t.id);
+        Track cur = currentTrack();
+        String startId = null;
+        if (cur != null) {
+            for (Track t : list) {
+                if (t.id.equals(cur.id)) {
+                    startId = cur.id;
+                    break;
+                }
+            }
+        }
+        if (startId == null) startId = list.get(0).id;
+        boolean keep = isPlaying() && cur != null && startId.equals(cur.id);
+        if (keep) {
+            PlaybackService.replaceQueue(this, -1, ids);
+            Toast.makeText(this, "已导入 " + ids.size() + " 首，继续播放当前曲目",
+                    Toast.LENGTH_SHORT).show();
+        } else {
+            PlaybackService.setQueue(this, -1, ids, startId);
+            Toast.makeText(this, "已导入 " + ids.size() + " 首并开始播放",
+                    Toast.LENGTH_SHORT).show();
+        }
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                refreshMini();
+            }
+        }, 400);
     }
 
     private void playFrom(List<Track> list, int pos, long pid) {
@@ -834,9 +966,13 @@ public class MainActivity extends Activity {
         public void onReceive(Context c, Intent i) {
             String a = i.getAction();
             if (PlaybackService.ACT_STATE.equals(a)) {
+                miniError = i.getStringExtra("error");
                 refreshMini();
-                String err = i.getStringExtra("error");
-                if (err != null) Toast.makeText(MainActivity.this, err, Toast.LENGTH_LONG).show();
+                if (miniError != null) {
+                    Toast.makeText(MainActivity.this, miniError, Toast.LENGTH_LONG).show();
+                }
+            } else if (PlaybackService.ACT_PROGRESS.equals(a)) {
+                updateMiniProgress(i.getIntExtra("pos", 0), i.getIntExtra("dur", 0));
             } else if (Downloader.ACT_DL.equals(a)) {
                 String id = i.getStringExtra(Downloader.EXTRA_ID);
                 int st = i.getIntExtra(Downloader.EXTRA_STATE, 0);
@@ -869,6 +1005,12 @@ public class MainActivity extends Activity {
         f.addAction(Importer.ACT_ADDED);
         f.addAction(CoverLoader.ACT_COVER);
         Receivers.registerLocal(this, receiver, f);
+        // 进程冷启动后服务可能不在（迷你条展示的是持久化状态）：唤醒它，
+        // 让 restore() 恢复队列，播放页/队列页/通知栏状态才能对上。
+        if (PlaybackService.get() == null
+                && App.prefs().getString("last_id", null) != null) {
+            PlaybackService.wake(this);
+        }
         refreshMini();
     }
 

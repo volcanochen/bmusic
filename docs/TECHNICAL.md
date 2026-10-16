@@ -191,6 +191,20 @@ private void startTrack(Track t) {
 - `queueIds` 保存当前队列的曲目 id 列表，`index` 指向当前曲
 - 模式：`MODE_LOOP`（列表循环）/ `MODE_SINGLE`（单曲循环）/ `MODE_SHUFFLE`（随机）
 - 模式持久化到 `SharedPreferences("mode")`
+- 队列操作（`onStartCommand` 按 action 分发）：
+
+| action | 语义 |
+| --- | --- |
+| `A_QUEUE` | 整体设置队列并播放指定曲目（歌单播放 / 播放全部） |
+| `A_PLAY_NOW` | 「立即播放」：不在队列则插入当前曲之后，随即播放 |
+| `A_QUEUE_KEEP` | 替换队列内容但**不打断**正在播放的曲目（曲库批量导入） |
+| `A_QUEUE_EDIT` | 队列编辑：移除 / 上移 / 下移 |
+
+- **冷启动与服务唤醒**：UI（MainActivity / PlayerActivity / QueueActivity）可能先于服务跑起来
+  （进程被系统回收或重装后），此时 `PlaybackService.get()` 为 null，界面展示的是
+  SharedPreferences 里的持久化状态。三处 UI 在服务缺失时调 `PlaybackService.wake()`
+  （无 action 的 `startForegroundService`，`onCreate` 会 `restore()` 出上次的队列），
+  避免出现「播放页显示 132 首、队列页却是空的」这种状态不一致。
 
 ### 5.5 界面刷新
 
@@ -303,7 +317,20 @@ interface Listener {
 
 底部常驻，展示当前曲的封面 / 标题 / 作者与播放暂停、下一首按钮；点击进入播放页。刷新由 `ACT_STATE` / `ACT_COVER` 广播驱动。
 
-### 8.5 分屏 / 浮窗（自由窗口）适配
+- 状态提示：依据播放器实时状态显示「缓冲中… / 播放中 / 已暂停」，并配一根粉色进度线
+- 标题 / 副标题切换时做淡入淡出 + 位移过渡（`animateText()`），播放键切换有脉冲缩放
+- 「立即播放 / 播放 N 首 / 加入队列」等队列事件都会立刻反映到迷你条上
+
+### 8.5 播放队列页（`QueueActivity`）与歌曲操作（`TrackActions`）
+
+- `QueueActivity` 复用曲库的 `item_track` 行布局与 `TrackAdapter`，当前曲目标记 ▶ 并高亮
+- 行点击 = 立即播放；`⋮` 弹出操作菜单（立即播放 / 上移 / 下移 / 缓存 / 加入歌单 / 从队列移除 / 删除曲目）
+- 各页面（曲库 / 最近 / 歌单详情 / 队列）的歌曲操作菜单收敛到 `TrackActions`
+  （`playNow / cache / addToPlaylist / confirmDelete`），避免同一逻辑四份实现
+- 歌词搜索预填由 `NeteaseLyric.suggestQuery(title, author)` 生成：去掉 `P1 / 第N集 / BV号` 等编号噪声，
+  「`<序号><歌手> - <歌名>`」类标题拆成「歌手 歌名」，不含编号与 UP 主名
+
+### 8.6 分屏 / 浮窗（自由窗口）适配
 
 多窗口下窗口尺寸可随时变化，且**不再等于物理屏幕**，因此布局不能依赖整机方向。
 
@@ -403,4 +430,4 @@ bmusic/
 
 ---
 
-<p align="center"><sub>BMusic 技术文档 · v1.0.0</sub></p>
+<p align="center"><sub>BMusic 技术文档 · v1.0.6</sub></p>

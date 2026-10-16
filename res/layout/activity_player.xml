@@ -48,15 +48,6 @@
                 android:text="@string/now_playing"
                 android:textColor="@color/text_sub"
                 android:textSize="13sp" />
-
-            <ImageButton
-                android:id="@+id/btn_queue"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="@null"
-                android:contentDescription="队列"
-                android:src="@drawable/ic_queue"
-                android:tint="@color/text_sub" />
         </LinearLayout>
 
         <View
@@ -267,7 +258,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="38dp"
                     android:background="@drawable/ripple_round"
-                    android:drawableLeft="@drawable/ic_queue"
+                    android:drawableLeft="@drawable/ic_add"
                     android:drawablePadding="6dp"
                     android:drawableTint="@color/text_sub"
                     android:minWidth="0dp"
@@ -294,6 +285,32 @@
                     android:paddingLeft="14dp"
                     android:paddingRight="14dp"
                     android:text="@string/lyrics"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_sub"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/row_queue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_queue"
+                    android:layout_width="match_parent"
+                    android:layout_height="38dp"
+                    android:background="@drawable/ripple_round"
+                    android:drawableLeft="@drawable/ic_queue"
+                    android:drawablePadding="6dp"
+                    android:drawableTint="@color/text_sub"
+                    android:gravity="center"
+                    android:minWidth="0dp"
+                    android:paddingLeft="16dp"
+                    android:paddingRight="16dp"
+                    android:text="@string/current_queue"
                     android:textAllCaps="false"
                     android:textColor="@color/text_sub"
                     android:textSize="12sp" />

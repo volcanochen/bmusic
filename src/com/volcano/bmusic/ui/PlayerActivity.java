@@ -67,9 +67,10 @@ public class PlayerActivity extends Activity {
     private TextView hint;
     private TextView pageBadge;
     private Button btnCache;
+    private Button btnQueue;
     // Original leading icons of the action buttons, so they can be restored
     // when the window grows again.
-    private Drawable cacheIcon, plIcon, lyricIcon;
+    private Drawable cacheIcon, plIcon, lyricIcon, queueIcon;
 
     // vertical volume control
     private VolumeBar volBar;
@@ -113,6 +114,7 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        if (PlaybackService.get() == null) PlaybackService.wake(this);
         landLayout = Win.wide(this);
         setContentView(landLayout ? R.layout.activity_player_land : R.layout.activity_player);
         bind();
@@ -200,6 +202,7 @@ public class PlayerActivity extends Activity {
         View addPl = findViewById(R.id.btn_add_pl);
         if (addPl != null) setHeight(addPl, compact ? 34 : 38);
         if (btnLyric != null) setHeight(btnLyric, compact ? 34 : 38);
+        if (btnQueue != null) setHeight(btnQueue, compact ? 34 : 38);
 
         // Narrow windows: forbid wrapping and drop the leading icons when the
         // three action labels would otherwise be clipped.
@@ -230,6 +233,7 @@ public class PlayerActivity extends Activity {
         tuneButton(btnCache, cacheIcon, compact, compact);
         tuneButton((Button) addPl, plIcon, compact, compact);
         tuneButton(btnLyric, lyricIcon, compact, compact);
+        tuneButton(btnQueue, queueIcon, compact, compact);
         if (compact) return;
         final View row = findViewById(R.id.row_btns);
         if (row == null) return;
@@ -315,6 +319,7 @@ public class PlayerActivity extends Activity {
         hint = (TextView) findViewById(R.id.hint);
         pageBadge = (TextView) findViewById(R.id.n_badge);
         btnCache = (Button) findViewById(R.id.btn_cache);
+        btnQueue = (Button) findViewById(R.id.btn_queue);
         volBar = (VolumeBar) findViewById(R.id.vol_bar);
         volPct = (TextView) findViewById(R.id.vol_pct);
         btnLyric = (Button) findViewById(R.id.btn_lyric);
@@ -329,6 +334,7 @@ public class PlayerActivity extends Activity {
         cacheIcon = firstDrawable(btnCache);
         plIcon = firstDrawable(addPl);
         lyricIcon = firstDrawable(btnLyric);
+        queueIcon = firstDrawable(btnQueue);
         initVolume();
     }
 
@@ -462,6 +468,12 @@ public class PlayerActivity extends Activity {
         cur = t;
         if (cur != null && !cur.id.equals(lastLyricKey)) {
             fetchLyricFor(cur);
+        }
+        if (btnQueue != null) {
+            int n = svc != null ? svc.queue().size() : 0;
+            btnQueue.setText(n > 0
+                    ? getString(R.string.current_queue) + "（" + n + "）"
+                    : getString(R.string.current_queue));
         }
         if (t == null) {
             title.setText("未在播放");
@@ -607,38 +619,9 @@ public class PlayerActivity extends Activity {
         });
     }
 
+    /** Open the queue screen (a full list, laid out like the library). */
     private void showQueue() {
-        PlaybackService svc = PlaybackService.get();
-        if (svc == null) {
-            Toast.makeText(this, "播放服务未运行", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        final ArrayList<String> ids = new ArrayList<String>(svc.queue());
-        App.postBg(new Runnable() {
-            @Override
-            public void run() {
-                final ArrayList<Track> ts = new ArrayList<Track>();
-                for (String id : ids) {
-                    Track t = Db.get(PlayerActivity.this).get(id);
-                    if (t != null) ts.add(t);
-                }
-                CharSequence[] names = new CharSequence[ts.size()];
-                for (int i = 0; i < ts.size(); i++) names[i] = (i + 1) + ". " + ts.get(i).title;
-                App.runOnUi(new Runnable() {
-                    @Override
-                    public void run() {
-                        new AlertDialog.Builder(PlayerActivity.this)
-                                .setTitle("播放队列（" + ts.size() + "首）")
-                                .setItems(names, new DialogInterface.OnClickListener() {
-                                    @Override
-                                    public void onClick(DialogInterface d, int w) {
-                                        PlaybackService.open(PlayerActivity.this, ts.get(w).id);
-                                    }
-                                }).show();
-                    }
-                });
-            }
-        });
+        startActivity(new Intent(PlayerActivity.this, QueueActivity.class));
     }
 
     /* ---------------- volume (vertical bar: display + control) ---------------- */
@@ -678,6 +661,14 @@ public class PlayerActivity extends Activity {
 
     /* ---------------- lyrics ---------------- */
 
+    /** "artist + song name" with part numbers / ids stripped — used to pre-fill. */
+    private static String suggestQuery(Track t) {
+        if (t == null) return "";
+        String q = NeteaseLyric.suggestQuery(t.title, t.author);
+        if (q.isEmpty()) q = t.title == null ? "" : t.title;
+        return q;
+    }
+
     private void toggleLyricPanel() {
         if (lyricPanel == null) return;
         if (lyricPanel.getVisibility() == View.VISIBLE) {
@@ -690,8 +681,7 @@ public class PlayerActivity extends Activity {
         if (lyricQuery != null) {
             String curQ = lyricQuery.getText() == null ? "" : lyricQuery.getText().toString().trim();
             if (curQ.isEmpty() && cur != null) {
-                String q = NeteaseLyric.cleanQuery(cur.title);
-                lyricQuery.setText(q.isEmpty() ? cur.title : q);
+                lyricQuery.setText(suggestQuery(cur));
             }
         }
         if (lyric != null) {
@@ -709,8 +699,7 @@ public class PlayerActivity extends Activity {
         lastLyricKey = t.id;
         lastLyricIdx = -1;
         lyric = null;
-        String q = NeteaseLyric.cleanQuery(t.title);
-        if (q.isEmpty()) q = t.title;
+        String q = suggestQuery(t);
         if (lyricQuery != null) lyricQuery.setText(q);
         if (lyricLines != null) lyricLines.removeAllViews();
         if (lyricStatus != null && lyricPanel != null
@@ -794,10 +783,7 @@ public class PlayerActivity extends Activity {
     private void manualSearch() {
         if (lyricQuery == null) return;
         String q = lyricQuery.getText() == null ? "" : lyricQuery.getText().toString().trim();
-        if (q.isEmpty() && cur != null) {
-            q = NeteaseLyric.cleanQuery(cur.title);
-            if (q.isEmpty()) q = cur.title;
-        }
+        if (q.isEmpty() && cur != null) q = suggestQuery(cur);
         if (q.isEmpty()) return;
         if (lyricStatus != null) lyricStatus.setText(getString(R.string.lyric_loading));
         NeteaseLyric.search(q, new NeteaseLyric.SearchCallback() {

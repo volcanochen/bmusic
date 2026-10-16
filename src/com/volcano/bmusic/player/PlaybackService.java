@@ -55,6 +55,12 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
     public static final String A_OPEN = "bm.a.open";
     public static final String A_QUEUE = "bm.a.queue";
     public static final String A_MODE = "bm.a.mode";
+    /** add to the current queue (right after the playing track) and play it now */
+    public static final String A_PLAY_NOW = "bm.a.playnow";
+    /** replace the queue list without restarting what is already playing */
+    public static final String A_QUEUE_KEEP = "bm.a.qkeep";
+    /** edit the queue: remove (op 0) or move (op -1 / +1) one entry */
+    public static final String A_QUEUE_EDIT = "bm.a.qedit";
 
     public static final String ACT_STATE = "com.volcano.bmusic.STATE";
     public static final String ACT_PROGRESS = "com.volcano.bmusic.PROGRESS";
@@ -138,6 +144,13 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
                 setQueue(pid, ids, startTid, auto);
             } else if (A_MODE.equals(a)) {
                 switchMode();
+            } else if (A_PLAY_NOW.equals(a)) {
+                insertAndPlay(intent.getStringExtra("id"));
+            } else if (A_QUEUE_KEEP.equals(a)) {
+                ArrayList<String> qids = intent.getStringArrayListExtra("ids");
+                replaceQueue(intent.getLongExtra("pid", -1), qids);
+            } else if (A_QUEUE_EDIT.equals(a)) {
+                editQueue(intent.getStringExtra("id"), intent.getIntExtra("op", 0));
         } else if (A_APPEND.equals(a)) {
             String id = intent.getStringExtra("id");
             if (id == null) return START_STICKY;
@@ -347,6 +360,58 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         index = i;
         saveQueue();
         openIndex(index, autoplay);
+    }
+
+    /**
+     * "立即播放": make sure the track is in the current queue (inserting it
+     * right after the playing one when it is not), then start it.
+     */
+    private void insertAndPlay(String id) {
+        if (id == null) return;
+        int i = queueIds.indexOf(id);
+        if (i < 0) {
+            int at = index + 1;
+            if (at < 0 || at > queueIds.size()) at = queueIds.size();
+            queueIds.add(at, id);
+            i = at;
+        }
+        index = i;
+        saveQueue();
+        openIndex(i, true);
+    }
+
+    /** Swap the whole queue list but keep the currently playing track playing. */
+    private void replaceQueue(long pid, ArrayList<String> ids) {
+        queuePid = pid;
+        if (ids != null) queueIds = new ArrayList<String>(ids);
+        String keep = cur != null ? cur.id : null;
+        if (keep != null) {
+            int i = queueIds.indexOf(keep);
+            if (i >= 0) index = i;
+        }
+        if (index < 0 || index >= queueIds.size()) index = 0;
+        saveQueue();
+        broadcastState();
+    }
+
+    /** Remove (op 0) or move (op -1 / +1) one entry of the queue. */
+    private void editQueue(String id, int op) {
+        if (id == null) return;
+        int i = queueIds.indexOf(id);
+        if (i < 0) return;
+        String curId = (index >= 0 && index < queueIds.size()) ? queueIds.get(index) : null;
+        if (op == 0) {
+            queueIds.remove(i);
+        } else {
+            int j = i + op;
+            if (j < 0 || j >= queueIds.size()) return;
+            queueIds.remove(i);
+            queueIds.add(j, id);
+        }
+        index = curId != null ? queueIds.indexOf(curId) : 0;
+        if (index < 0) index = 0;
+        saveQueue();
+        broadcastState();
     }
 
     private void openIndex(int i, boolean autoplay) {
@@ -953,6 +1018,42 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         i.putStringArrayListExtra("ids", ids);
         i.putExtra("start", startId);
         i.putExtra("auto", true);
+        start(c, i);
+    }
+
+    /** 立即播放：加入当前播放列表并马上播这首（已在列表中则直接切过去）。 */
+    public static void playNow(Context c, String id) {
+        Intent i = new Intent(c, PlaybackService.class);
+        i.setAction(A_PLAY_NOW);
+        i.putExtra("id", id);
+        start(c, i);
+    }
+
+    /** 替换队列内容，但不打断正在播放的曲目。 */
+    public static void replaceQueue(Context c, long pid, ArrayList<String> ids) {
+        Intent i = new Intent(c, PlaybackService.class);
+        i.setAction(A_QUEUE_KEEP);
+        i.putExtra("pid", pid);
+        i.putStringArrayListExtra("ids", ids);
+        start(c, i);
+    }
+
+    /** 队列编辑：op = 0 移除，-1 上移，+1 下移。 */
+    public static void editQueue(Context c, String id, int op) {
+        Intent i = new Intent(c, PlaybackService.class);
+        i.setAction(A_QUEUE_EDIT);
+        i.putExtra("id", id);
+        i.putExtra("op", op);
+        start(c, i);
+    }
+
+    /**
+     * 唤醒服务（不改变播放状态）：进程冷启动后 UI 先于服务跑起来时，
+     * 用它让服务 onCreate -> restore() 把上次的队列/曲目恢复出来。
+     * 无 action 的 intent 在 onStartCommand 里不会命中任何分支。
+     */
+    public static void wake(Context c) {
+        Intent i = new Intent(c, PlaybackService.class);
         start(c, i);
     }
 

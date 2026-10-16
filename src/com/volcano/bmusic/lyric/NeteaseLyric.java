@@ -163,6 +163,72 @@ public final class NeteaseLyric {
         return t;
     }
 
+    /** Drop series / numbering noise: P1, 第3集, BV号, av号, EP01, CD2 ... */
+    public static String stripNumbering(String title) {
+        if (title == null) return "";
+        String s = title;
+        s = s.replaceAll("(?i)\\bBV[0-9A-Za-z]{8,}", " ");
+        s = s.replaceAll("(?i)\\bav\\s?\\d+", " ");
+        s = s.replaceAll("(?i)\\b[Pp]\\s?\\d+\\b", " ");
+        s = s.replaceAll("[第]\\s*\\d+\\s*[集期话章节曲篇]", " ");
+        s = s.replaceAll("(?i)\\b(ep|part)\\s?\\d+\\b", " ");
+        s = s.replaceAll("(?i)\\b(CD|DVD|Disc)\\s?\\d+\\b", " ");
+        s = s.replaceAll("(?i)\\b(4K|8K|HD|FHD|60fps|Hi-Res)\\b", " ");
+        s = s.replaceAll("\\s+", " ").trim();
+        return s;
+    }
+
+    /**
+     * Strip a leading track number ("24周杰伦", "01. 晴天", "3) xxx") — the
+     * numbers the library uses to order a collection are not part of the name.
+     */
+    public static String stripLeadingNumber(String s) {
+        if (s == null) return "";
+        return s.replaceAll("^\\s*\\d+\\s*[.、．:：\\-]?\\s*", " ").trim();
+    }
+
+    /** Clean an UP-loaders' name into something usable as an artist keyword. */
+    public static String cleanAuthor(String author) {
+        if (author == null) return "";
+        String a = cleanQuery(author);
+        a = a.replaceAll("(?i)\\s*(官方|official)?\\s*(账号|频道|channel|工作室|studio)\\s*$", " ");
+        a = a.replaceAll("(?i)\\s*(music|musique|音乐)\\s*$", " ");
+        return a.trim();
+    }
+
+    /**
+     * Pre-fill for the lyrics search box: "artist + song name", with bracket
+     * tags, part numbers, track numbers and video ids removed.
+     *
+     * B站 music collections are usually titled "24周杰伦 - 枫" or
+     * "歌手 - 歌名", so the dash is used to split artist from title *before*
+     * any tag stripping. The UP-loader's name is only used as a fallback when
+     * the title itself carries no artist.
+     */
+    public static String suggestQuery(String title, String author) {
+        String raw = title == null ? "" : title.trim();
+        String singer = "";
+        String song = "";
+        int dash = raw.indexOf(" - ");
+        if (dash > 0 && dash < raw.length() - 3) {
+            singer = cleanQuery(raw.substring(0, dash));
+            song = cleanQuery(raw.substring(dash + 3));
+        } else {
+            song = cleanQuery(raw);
+        }
+        song = stripLeadingNumber(stripNumbering(song));
+        singer = stripLeadingNumber(stripNumbering(singer));
+        String up = stripNumbering(cleanAuthor(author));
+        if (singer.isEmpty()) singer = up;
+        if (song.isEmpty()) song = singer;
+        if (singer.isEmpty() || song.isEmpty()) {
+            return (singer + " " + song).trim();
+        }
+        if (song.contains(singer)) return song;
+        if (singer.contains(song)) return singer;
+        return singer + " " + song;
+    }
+
     private static Song searchBest(String query) throws Exception {
         List<Song> l = searchList(query);
         return (l != null && !l.isEmpty()) ? l.get(0) : null;

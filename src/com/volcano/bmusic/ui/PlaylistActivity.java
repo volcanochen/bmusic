@@ -93,42 +93,56 @@ public class PlaylistActivity extends Activity {
     }
 
     private void menu(final Track t) {
-        final String[] items = {"立即播放", "上移", "下移", "缓存到本地", "从歌单移除"};
-        new AlertDialog.Builder(this)
-                .setTitle(t.title)
-                .setItems(items, new DialogInterface.OnClickListener() {
+        final String[] items = {"立即播放", "上移", "下移", "缓存到本地", "加入歌单",
+                "从歌单移除", "删除曲目"};
+        TrackActions.showMenu(this, t, items, new TrackActions.ItemHandler() {
+            @Override
+            public void onItem(Track track, int which) {
+                switch (which) {
+                    case 0:
+                        TrackActions.playNow(PlaylistActivity.this, track);
+                        break;
+                    case 1:
+                        move(track, -1);
+                        break;
+                    case 2:
+                        move(track, 1);
+                        break;
+                    case 3:
+                        TrackActions.cache(PlaylistActivity.this, track);
+                        break;
+                    case 4:
+                        TrackActions.addToPlaylist(PlaylistActivity.this, track);
+                        break;
+                    case 5:
+                        removeFrom(track);
+                        break;
+                    case 6:
+                        TrackActions.confirmDelete(PlaylistActivity.this, track, new Runnable() {
+                            @Override
+                            public void run() {
+                                load();
+                            }
+                        });
+                        break;
+                }
+            }
+        });
+    }
+
+    private void removeFrom(final Track t) {
+        App.postBg(new Runnable() {
+            @Override
+            public void run() {
+                Db.get(PlaylistActivity.this).removeFrom(pid, t.id);
+                App.runOnUi(new Runnable() {
                     @Override
-                    public void onClick(DialogInterface d, int w) {
-                        switch (w) {
-                            case 0:
-                                PlaybackService.open(PlaylistActivity.this, t.id);
-                                break;
-                            case 1:
-                                move(t, -1);
-                                break;
-                            case 2:
-                                move(t, 1);
-                                break;
-                            case 3:
-                                com.volcano.bmusic.util.Downloader.start(PlaylistActivity.this, t);
-                                break;
-                            case 4:
-                                App.postBg(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        Db.get(PlaylistActivity.this).removeFrom(pid, t.id);
-                                        App.runOnUi(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                load();
-                                            }
-                                        });
-                                    }
-                                });
-                                break;
-                        }
+                    public void run() {
+                        load();
                     }
-                }).show();
+                });
+            }
+        });
     }
 
     private void move(final Track t, final int delta) {
