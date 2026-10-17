@@ -58,54 +58,73 @@ public final class MetaResolver {
         if (t == null) return;
         String part = safe(t.title);
         String whole = safe(t.srcTitle);
+        String author = NeteaseLyric.cleanAuthor(t.author);
+
         // 分 P 名可能只是「01」「P1」这种，那就以合集标题为准
-        String base = part.length() >= 2 && !isNumberOnly(part) ? part : whole;
-        if (base.isEmpty()) base = whole;
-        if (base.isEmpty()) return;
+        if (part.length() < 2 || isNumberOnly(part)) part = whole;
+        if (part.isEmpty()) part = whole;
+        if (part.isEmpty()) return;
+
+        // 先去掉合集曲目序号「0123. 」「12、」「12:」，并记住它是否存在
+        String stripped = stripSeq(part);
+        boolean numbered = !stripped.equals(part);
+        String base = stripped.isEmpty() ? part : stripped;
+
+        String song = "";
+        String singer = "";
+        String album = "";
 
         // 1) 《歌名》优先 —— 书名号里几乎总是歌名，外面的短词是歌手
-        String singer = "";
-        String song = "";
         String bookSong = firstBook(base);
         if (bookSong != null) {
             song = bookSong;
             String outside = base.replaceAll("《[^》]*》", " ").trim();
-            int d0 = indexOfSeparator(outside);
-            String cand = denoise(d0 > 0 ? outside.substring(0, d0) : outside);
-            if (cand.isEmpty()) cand = denoise(outside);
+            String cand = cleanArtist(outside);
             if (looksLikeArtist(cand)) singer = cand;
         } else {
-            // 2) 「歌手 - 歌名」/「歌名 - 歌手」
+            // 2) 「A - B」：优先用 UP 主、序号判断哪边是歌手
             int dash = indexOfSeparator(base);
             if (dash > 0) {
                 String left = base.substring(0, dash).trim();
                 String right = base.substring(dash + sepLen(base, dash)).trim();
-                if (looksLikeArtist(left) && !looksLikeArtist(right)) {
+                boolean leftIsAuthor = !author.isEmpty() && norm(left).equals(norm(author));
+                boolean rightIsAuthor = !author.isEmpty() && norm(right).equals(norm(author));
+                if (leftIsAuthor) {
+                    // UP 主在左 → 右边是歌名
                     singer = left;
                     song = right;
-                } else if (looksLikeArtist(right) && !looksLikeArtist(left)) {
+                } else if (rightIsAuthor) {
+                    // UP 主在右 → 左边是歌名
                     singer = right;
                     song = left;
+                } else if (numbered) {
+                    // 合集惯例：序号. 歌名 - 歌手（歌手在右）
+                    song = left;
+                    singer = right;
                 } else {
-                    song = right;
+                    // 普通「歌手 - 歌名」（歌手在左）
                     singer = left;
+                    song = right;
                 }
             } else {
                 song = base;
+                singer = author;
             }
         }
 
-        // 2) 【xx】/《xx》 括号内容：短且无噪声 → 歌手；含「专辑」→ 专辑
-        String album = "";
-        List<String> tags = brackets(song);
-        for (String tag : tags) {
-            if (tag.contains("专辑")) {
-                String v = tag.replace("专辑", "").replace(":", "").replace("：", "").trim();
-                if (v.length() > 0) album = v;
-            } else if (singer.isEmpty() && looksLikeArtist(tag)) {
-                singer = tag;
+        // 3) 括号里的歌手（【林火火】/（林火火翻唱））—— 仅在没歌手或只是 UP 主兜底时用
+        if (singer.isEmpty() || (!author.isEmpty() && norm(singer).equals(norm(author)))) {
+            for (String tag : brackets(base)) {
+                String ct = cleanArtist(tag.replace("翻唱", " ")
+                        .replace("cover", " ").replace("Cover", " "));
+                if (!ct.isEmpty() && looksLikeArtist(ct)) {
+                    singer = ct;
+                    break;
+                }
             }
         }
+
+        // 4) 专辑：只认明确标注的「专辑：xxx」
         if (album.isEmpty()) {
             for (String tag : brackets(base)) {
                 if (tag.contains("专辑")) {
@@ -115,45 +134,47 @@ public final class MetaResolver {
             }
         }
 
-        // 3) 去掉括号标签、MV/官方等噪声和曲目编号，得到干净歌名
+        // 5) 清理噪声。歌名兜底保证非空
         song = denoise(song);
-        singer = denoise(singer);
-
-        // 4) 歌手还空着：合集标题里找（《》前面的短词最可能是歌手），再退回 UP 主
-        if (singer.isEmpty() && !whole.isEmpty() && !whole.equals(base)) {
-            int bi = firstBracketIndex(whole);
-            if (bi > 0) {
-                String head = denoise(whole.substring(0, bi));
-                if (looksLikeArtist(head)) singer = head;
-            }
-            if (singer.isEmpty()) {
-                int d2 = indexOfSeparator(whole);
-                if (d2 > 0) {
-                    String left = whole.substring(0, d2).trim();
-                    if (looksLikeArtist(left)) singer = denoise(left);
-                }
-            }
-            if (singer.isEmpty()) {
-                for (String tag : brackets(whole)) {
-                    if (looksLikeArtist(tag)) {
-                        singer = denoise(tag);
-                        break;
-                    }
-                }
-            }
-        }
-        if (singer.isEmpty()) singer = NeteaseLyric.cleanAuthor(t.author);
+        if (song.isEmpty()) song = denoise(base);
+        if (song.isEmpty()) song = base;
+        singer = cleanArtist(singer);
+        if (singer.isEmpty()) singer = author;
 
         if (overwrite) {
             if (!song.isEmpty()) t.song = song;
             if (!singer.isEmpty()) t.artist = singer;
-            t.album = album;
+            // 专辑：只在解析到明确信息时覆盖，避免清掉之前联网补到的正确专辑
+            if (!album.isEmpty()) t.album = album;
         } else {
             if (t.song == null || t.song.isEmpty()) t.song = song;
             if (t.artist == null || t.artist.isEmpty()) t.artist = singer;
             if (t.album == null || t.album.isEmpty()) t.album = album;
         }
         if (t.srcTitle == null || t.srcTitle.isEmpty()) t.srcTitle = whole;
+    }
+
+    /** 去掉合集里的曲目序号前缀「0123. 」「12、」「12:」「12．」。 */
+    private static String stripSeq(String s) {
+        if (s == null) return "";
+        return s.replaceAll("^\\s*\\d{1,4}\\s*[.、．:：]\\s*", "").trim();
+    }
+
+    /**
+     * 清理歌手名：去括号标签/噪声、剥离尾部「歌曲/音乐/合集/精选…」、
+     * 把「A _ B」这种多歌手分隔符统一成「A / B」。
+     */
+    private static String cleanArtist(String s) {
+        if (s == null) return "";
+        String t = denoise(s);
+        // 反复剥掉尾部描述词（denoise 会先删「合集」，这里再收拾「歌曲」「音乐」等）
+        t = t.replaceAll("((歌曲|音乐|合集|精选|歌单|无损|品质|音质|高音质|珍藏|典藏|全收录|收录)\\s*)+$", "")
+                .trim();
+        t = t.replaceAll("\\s*_\\s*", " / ");
+        t = t.replaceAll("\\s*/\\s*", " / ");
+        t = t.replaceAll("\\s+", " ").trim();
+        t = t.replaceAll("^[/\\s]+|[/\\s]+$", "").trim();
+        return t;
     }
 
     private static String safe(String s) {
@@ -277,8 +298,8 @@ public final class MetaResolver {
     public static void backfill(final Context c) {
         if (c == null) return;
         final Context app = c.getApplicationContext();
-        if (com.volcano.bmusic.App.prefs().getBoolean("meta_backfill_v3", false)) return;
-        com.volcano.bmusic.App.prefs().edit().putBoolean("meta_backfill_v3", true).apply();
+        if (com.volcano.bmusic.App.prefs().getBoolean("meta_backfill_v4", false)) return;
+        com.volcano.bmusic.App.prefs().edit().putBoolean("meta_backfill_v4", true).apply();
         QUEUE.execute(new Runnable() {
             @Override
             public void run() {
@@ -286,20 +307,32 @@ public final class MetaResolver {
                     List<Track> all = Db.get(app).allTracks();
                     int changed = 0;
                     for (Track t : all) {
-                        // 用标题重新推导，覆盖掉之前可能匹错的联网结果
+                        // 用标题重新推导（修正旧版「歌名-歌手」颠倒），不清已有专辑
                         parseLocal(t, true);
                         Db.get(app).setMeta(t.id, t.song, t.artist, t.album);
                         changed++;
-                        try {
-                            enrich(app, t);
-                        } catch (Exception ignored) {
-                        }
                     }
                     if (changed > 0) {
                         android.content.Intent i = new android.content.Intent(ACT_META);
                         i.setPackage(app.getPackageName());
                         i.putExtra("n", changed);
                         app.sendBroadcast(i);
+                    }
+                    // 联网补空专辑：节流 400ms，连续 3 次请求失败（疑似限流）即停
+                    int fail = 0;
+                    for (Track t : all) {
+                        if (t.album != null && !t.album.trim().isEmpty()) continue;
+                        int r = enrich(app, t);
+                        if (r < 0) {
+                            fail++;
+                            if (fail >= 3) break;
+                        } else {
+                            fail = 0;
+                        }
+                        try {
+                            Thread.sleep(400);
+                        } catch (InterruptedException ignored) {
+                        }
                     }
                 } catch (Exception ignored) {
                 }
@@ -308,66 +341,64 @@ public final class MetaResolver {
     }
 
     /**
-     * 用网易云搜索校准：以「歌手 + 歌名」搜，取字符重合度最高的候选，
-     * 补全歌手/专辑，并把歌名换成规范写法（只在明显更匹配时替换）。
+     * 用网易云搜索**只补专辑**：绝不改歌名/歌手。标题已经足够可靠，
+     * 联网只做锦上添花；候选必须「歌名高度一致 + 歌手对得上」才采纳，
+     * 否则宁可留空（列表显示 Unknown），也不张冠李戴。
+     *
+     * @return 1 补到专辑；0 没匹配到；-1 请求失败（疑似限流）
      */
-    public static void enrich(Context c, Track t) {
+    public static int enrich(Context c, Track t) {
+        if (c == null || t == null) return 0;
         String song = safe(t.song);
         String artist = safe(t.artist);
-        if (song.isEmpty() && safe(t.title).isEmpty()) return;
+        if (song.isEmpty()) return 0;
+        // 已有专辑就不必再请求
+        if (t.album != null && !t.album.trim().isEmpty()) return 0;
 
-        String query = song;
-        if (!artist.isEmpty() && !song.toLowerCase().contains(artist.toLowerCase())) {
-            query = artist + " " + song;
-        }
-        if (query.isEmpty()) query = safe(t.title);
+        String ns = norm(song);
+        String na = norm(artist);
+        String query = (!artist.isEmpty() && !ns.contains(na)) ? (artist + " " + song) : song;
+        if (query.isEmpty()) query = song;
 
         List<NeteaseLyric.Song> hits = NeteaseLyric.searchNow(query);
-        if (hits == null || hits.isEmpty()) hits = NeteaseLyric.searchNow(song);
-        if (hits == null || hits.isEmpty()) return;
+        if (hits == null) return -1;                       // 请求失败 / 限流
+        if (hits.isEmpty() && !query.equals(song)) {
+            hits = NeteaseLyric.searchNow(song);
+            if (hits == null) return -1;
+        }
+        if (hits.isEmpty()) return 0;
 
         NeteaseLyric.Song best = null;
-        int bestScore = 0;
+        int bestScore = -1;
         for (NeteaseLyric.Song s : hits) {
-            int nameScore = score(song, s.name);
-            boolean artistHit = !artist.isEmpty() && artistMatches(artist, s.artist);
-            // 已知歌手时，候选必须歌手对得上，否则至少歌名要完全包含 ——
-            // 否则很容易被同名翻唱 / 合集带跑（专辑、歌手全错）。
-            if (!artist.isEmpty() && !artistHit && nameScore < song.length()) continue;
-            int sc = nameScore + (artistHit ? 6 : 0);
+            if (s == null || s.name == null || s.name.trim().isEmpty()) continue;
+            if (!songMatches(song, s.name)) continue;
+            boolean artOk = artist.isEmpty() || artistMatches(artist, s.artist);
+            if (!artOk) continue;                          // 歌手对不上不采纳
+            int sc = score(song, s.name) + 5;
             if (sc > bestScore) {
                 bestScore = sc;
                 best = s;
             }
         }
-        // 要求至少一半字符命中，避免把无关歌曲的歌手安上来
-        if (best == null || bestScore < Math.max(2, song.length() / 2)) return;
+        if (best == null || best.album == null || best.album.trim().isEmpty()) return 0;
 
-        String newSong = t.song;
-        String newArtist = t.artist;
-        String newAlbum = t.album;
-        if (best.name != null && !best.name.trim().isEmpty()
-                && score(song, best.name) >= score(song, song)) {
-            newSong = best.name.trim();
-        }
-        if (t.artist == null || t.artist.isEmpty() || bestScore >= song.length()) {
-            if (best.artist != null && !best.artist.trim().isEmpty()) newArtist = best.artist.trim();
-        }
-        if ((t.album == null || t.album.isEmpty())
-                && best.album != null && !best.album.trim().isEmpty()) {
-            newAlbum = best.album.trim();
-        }
-        if (same(newSong, t.song) && same(newArtist, t.artist) && same(newAlbum, t.album)) {
-            return;
-        }
-        t.song = newSong;
-        t.artist = newArtist;
-        t.album = newAlbum;
-        Db.get(c).setMeta(t.id, newSong, newArtist, newAlbum);
+        t.album = best.album.trim();
+        Db.get(c).setMeta(t.id, t.song, t.artist, t.album);
         android.content.Intent i = new android.content.Intent(ACT_META);
         i.setPackage(c.getPackageName());
         i.putExtra("id", t.id);
         c.sendBroadcast(i);
+        return 1;
+    }
+
+    /** 歌名一致判定：短名（<3 字）必须完全一致，长名允许包含（如多加「现场版」）。 */
+    private static boolean songMatches(String want, String got) {
+        String a = norm(want);
+        String b = norm(got);
+        if (a.isEmpty() || b.isEmpty()) return false;
+        if (a.equals(b)) return true;
+        return a.length() >= 3 && b.contains(a);
     }
 
     private static boolean same(String a, String b) {

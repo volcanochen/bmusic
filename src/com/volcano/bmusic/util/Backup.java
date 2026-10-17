@@ -52,6 +52,10 @@ public final class Backup {
                 t2.put("page", t.page);
                 t2.put("title", t.title);
                 t2.put("author", t.author);
+                t2.put("song", t.song);
+                t2.put("artist", t.artist);
+                t2.put("album", t.album);
+                t2.put("srcTitle", t.srcTitle);
                 t2.put("cover", t.cover);
                 t2.put("duration", t.duration);
                 t2.put("added", t.added);

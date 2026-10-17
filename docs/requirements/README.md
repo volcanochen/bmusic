@@ -114,6 +114,7 @@
 | H8 | 布局属性 `hintTextColor` 不存在 | 自主 | v1.0.4 | 改用 `android:textColorHint` |
 | H9 | 桌面小组件点按钮无反应（`Background start not allowed: ... startFg?=false`） | 自主 | v1.0.9 | Android 12+ 从桌面 `PendingIntent.getService` 启动服务被拦截；API 26+ 改用 `PendingIntent.getForegroundService`（服务 onCreate 即 startForeground，满足 5s 要求），API 24/25 仍走 getService |
 | H10 | b23.tv 短链走不进 App（`query-activities` 查不到 BMusic） | 自主 | v1.0.9 | 同一 intent-filter 内多个 `<data>` 是合并求交：`/video/` pathPrefix 约束被应用到 `b23.tv` 上。把 b23.tv / www.b23.tv 拆成独立 intent-filter（无 path 约束）后短链恢复匹配 |
+| H11 | 导入推断的歌名/歌手解析错误（把合集「序号. 歌名 - 歌手」整条颠倒成「歌手=带序号歌名」，且联网校准还会覆盖歌名/歌手导致错配） | 用户 | v1.0.14 | 重写 `MetaResolver.parseLocal`：先 `stripSeq` 剥序号并记 `numbered`，按 UP 主名（`cleanAuthor`）在左/右 + 是否有序号判定「歌名-歌手」左右，`《》`优先，`A _ B` 多歌手统一为 `A / B`；`enrich` 改为**只补专辑**、绝不改歌名/歌手，且须「歌名高度一致 + 歌手对得上」才采纳，否则留空显示 Unknown；`backfill` 升 `meta_backfill_v4`，用标题重推全部存量、再对无专辑曲目节流补专辑（连续 3 次失败即停防限流） |
 
 ### I. 桌面小组件（v1.0.9）
 
@@ -173,6 +174,7 @@
 | 43 | 勾选模式支持全选/反选 | v1.0.13 | 选择栏加「全选」「反选」按钮；`MainActivity.selectAllTracks()` / `invertSelectedTracks()` 基于 `trackAdapter.data()` 批量操作 `libSelected` 后 `setSelectable` 刷新 |
 | 44 | 删除全部按钮改为删除所选（灰度/亮起） | v1.0.13 | 头部 `btn_lib_clear` 由「清空曲库」改为 `deleteSelectedTracks`；`updateLibSelCount()` 按 `libSelected` 是否为空 `setEnabled` + `setAlpha(0.35/1.0)`；移除选择栏冗余删除按钮 |
 | 45 | 列表显示「歌手 - 歌名」+ 专辑小字 | v1.0.13 | `Track.listTitle()` = 歌手(空为 Unknown) + " - " + 歌名；`Track.listSub()` = 专辑(空为 Unknown)；`TrackAdapter` 列表行改用这两个方法（曲库/最近/歌单/队列一致） |
+| 46 | 歌名/歌手/专辑解析纠错 | v1.0.14 | `MetaResolver.parseLocal` 重写：剥序号后按「UP 主所在侧 + 是否有序号」判定「歌名 - 歌手」左右（`《》`优先、`_`→` / `）；`enrich` 仅补专辑、不覆盖歌名/歌手；`backfill v4` 用标题重推 99 首存量 |
 
 ---
 
@@ -186,8 +188,9 @@
 - v1.0.11 在 Note8 验证：曲库多选 2 首→「加入播放队列」→播放页队列 1→3 首；队列页行菜单「删除曲目」→队列 3→2 首且曲库同步 2 首；多选 2 首→「加入歌单」→toast 已加入 2 首、歌单计数即时刷新为 2（重启前也一致，说明数据与 UI 同步）；小组件播放钮水平垂直居中；
 - v1.0.12 在 Note8 验证：①批量勾选 2 首→「加入歌单」→选择器含「新建歌单...」→新建「Mix」后提示已加入 2 首、歌单计数刷新；②歌单被播放后列表显示「正在播放」、歌单内当前曲目粉色高亮（`R.id.now` 图标 + 标题变粉）；③返回 B 站直接拉起 B 站 App、定位正确视频且分 P 正确（不再经浏览器）；④删除曲目弹窗含「同时会从曲库删除，本地缓存也一并删除」；⑤导入后曲库按歌手/专辑筛选可用，元信息识别正确（如「A20 LITE 'NEON' / A2O · NEON」）；`MetaResolver` 本地解析 9 例单测通过，联网校准在 429 时安全降级（parseLocal 已足够）；
 - v1.0.13 在 Note8 验证：①勾选模式点「全选」→「已选 249 / 249」全部打勾；再点「反选」→「已选 0 / 249」并保持在勾选模式；②未勾选时头部删除按钮置灰（alpha 0.35）且禁用，勾选后正常亮起；③列表主标题为「歌手 - 歌名」（如「梁静茹 - 从前的爱」），下方小字为专辑（如「燕尾蝶」），未解析到显示 `Unknown`；曲库/最近/歌单/队列共用 TrackAdapter 格式一致；
+- v1.0.14 在 Note8 验证（解析纠错）：存量 99 首经 `backfill v4` 重推后，曲库列表全部为「歌手 - 歌名 / 专辑」正确格式，逐条对照源标题核实——`0051. 不想睡 - 梁静茹`→「梁静茹 - 不想睡」、`0043. PK - 梁静茹 _ 曹格`→「梁静茹 / 曹格 - PK」、`0041. 向左转向右转 - 梁静茹`→「梁静茹 - 向左转向右转」、`0042. 幸福洋果子店 - 梁静茹`→「梁静茹 - 幸福洋果子店」；专辑为真实专辑名（亲亲/燕尾蝶/崇拜/美丽人生/静茹&情歌），证明联网仅补专辑、未覆盖歌名歌手；离线 Python 复刻新旧 `parseLocal` 对 99 条真实标题全量比对通过；
 - 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）。
 
 ---
 
-<p align="center"><sub>BMusic requirements · 更新于 v1.0.13</sub></p>
+<p align="center"><sub>BMusic requirements · 更新于 v1.0.14</sub></p>
