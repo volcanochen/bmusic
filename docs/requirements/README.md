@@ -156,6 +156,11 @@
 | 26 | 粘贴链接快速添加 | v1.0.9 | 「+」来源菜单第一项直接读剪贴板 → `doImport` |
 | 27 | 曲库批量：多选删除 / 一键清空 | v1.0.9 | 复用 `TrackAdapter.setSelectable` 多选；`Db.deleteTrack` 批删 + `removeIds`；`Db.clearTracks` + `clearQueue` |
 | 28 | 检查更新（版本比对 + 介绍页） | v1.0.9 | 拉 `release/version.json` 比对 versionCode → `UpdateActivity` 介绍页 / 「已是最新」提示 |
+| 29 | 离线播放：跳过未缓存曲目，整列表无缓存则停 | v1.0.10 | `PlaybackService.isOffline()`（ConnectivityManager）；startSource / onError / doPlay 三处前置离线检查 → `skipOffline()` 计数一轮（prepared 成功或 setQueue 归零） |
+| 30 | 扫码方向/比例/识别率修复 | v1.0.10 | `setDisplayOrientation(传感器-屏幕旋转)` + 预览 SurfaceView 按 letterbox 调宽高比 + 解码帧按显示方向旋转（4 向轮试）；QrDecoder 增加自适应局部二值化（积分图窗口均值-15%）兜底 |
+| 31 | 设置页介绍文字移至独立关于页 | v1.0.10 | `AboutActivity`：图标/版本/介绍/三种添加方式/开源地址（长按复制）；设置页改为一行入口 |
+| 32 | 数据备份/恢复 + 打开缓存文件夹 | v1.0.10 | `util/Backup`：导出 JSON（曲目+歌单+历史）到 Download（API29+ MediaStore，≤28 直写+权限）；恢复为合并语义（已有不覆盖，恢复后视为未缓存）；`openFolder` ACTION_VIEW resource/folder → 兜底弹路径+复制 |
+| 33 | 小组件两行歌曲信息自适应 | v1.0.10 | 播放钮缩至 62dp；歌名/歌手两行 `setTextViewTextSize` 按长度分档（15→9sp），保证 ≥8 字不省略 |
 
 ---
 
@@ -165,6 +170,7 @@
 - v1.0.7「返回 B 站」在 Note8 上验证菜单项与跳转；v1.0.8 的八项（自动缓存/歌词过滤/布局重排/队列批量操作/四页导航/应用更新）在 Note8 验证，更新链路实测到系统安装器弹出；
 - v1.0.9 桌面小组件已在 Note8 验证：添加到桌面、按钮播放/暂停切换（`dumpsys media_session` state 2↔3）、图标随 ACT_STATE 同步、点按钮外空间打开播放页且播放不间断；
 - v1.0.9 其余各项 Note8 验证：相册识别二维码→导入成功（BV1xx411c7mD）、多选勾选（已选 1/3）→删除→曲目移除（3→2首）、清空确认框、扫码页+相机权限+实时预览、检查更新显示「已是最新 v1.0.9」（真机拉取线上 version.json）；
+- v1.0.10 在 Note8 验证：关网后播放逐首跳过并提示、整列表无缓存试完一轮停止（toast「整个列表都没有缓存，已停止播放」）；扫码预览正立不变形、相册识别回归通过；设置页无介绍文字、关于页正常（v1.0.10）；备份导出 Download/bmusic_backup_*.json 成功、删除曲目后恢复合并导入成功（2→3 首）；打开缓存文件夹弹路径兜底；小组件显示小圆钮+两行完整文字；
 - 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）。
 
 ---
