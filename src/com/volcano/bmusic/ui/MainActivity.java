@@ -122,7 +122,8 @@ public class MainActivity extends Activity {
     private View btnLibQueueSel;
     private View btnLibPlSel;
     private View btnLibClear;
-    private View btnLibDelSel;
+    private View btnLibSelAll;
+    private View btnLibSelInv;
     private View btnLibCancel;
     private View libSelBar;
     private TextView tvLibSel;
@@ -243,7 +244,8 @@ public class MainActivity extends Activity {
         miniPlay = (ImageButton) findViewById(R.id.mini_play);
         btnLibSelect = findViewById(R.id.btn_lib_select);
         btnLibClear = findViewById(R.id.btn_lib_clear);
-        btnLibDelSel = findViewById(R.id.btn_lib_del_sel);
+        btnLibSelAll = findViewById(R.id.btn_lib_sel_all);
+        btnLibSelInv = findViewById(R.id.btn_lib_sel_inv);
         btnLibCancel = findViewById(R.id.btn_lib_cancel_sel);
         btnLibQueueSel = findViewById(R.id.btn_lib_queue_sel);
         btnLibPlSel = findViewById(R.id.btn_lib_pl_sel);
@@ -443,11 +445,19 @@ public class MainActivity extends Activity {
                 }
             });
         }
-        if (btnLibDelSel != null) {
-            btnLibDelSel.setOnClickListener(new View.OnClickListener() {
+        if (btnLibSelAll != null) {
+            btnLibSelAll.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    deleteSelectedTracks();
+                    selectAllTracks();
+                }
+            });
+        }
+        if (btnLibSelInv != null) {
+            btnLibSelInv.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    invertSelectedTracks();
                 }
             });
         }
@@ -471,9 +481,12 @@ public class MainActivity extends Activity {
             btnLibClear.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    confirmClearLibrary();
+                    deleteSelectedTracks();
                 }
             });
+            // 初始无勾选 → 禁用并置灰（进入勾选模式且勾选后才会亮起）
+            btnLibClear.setEnabled(false);
+            btnLibClear.setAlpha(0.35f);
         }
         if (btnPlayFilter != null) {
             btnPlayFilter.setOnClickListener(new View.OnClickListener() {
@@ -1515,9 +1528,6 @@ public class MainActivity extends Activity {
         tvLibSel.setText(getString(R.string.lib_selected,
                 libSelected.size(), trackAdapter.getCount()));
         boolean has = !libSelected.isEmpty();
-        if (btnLibDelSel != null) {
-            btnLibDelSel.setVisibility(has ? View.VISIBLE : View.GONE);
-        }
         if (btnLibQueueSel != null) {
             btnLibQueueSel.setVisibility(has ? View.VISIBLE : View.GONE);
         }
@@ -1526,6 +1536,11 @@ public class MainActivity extends Activity {
         }
         if (btnLibCancel != null) {
             btnLibCancel.setVisibility(has ? View.VISIBLE : View.GONE);
+        }
+        // 删除按钮（头部垃圾桶）：未勾选时禁用并置灰，有勾选时正常亮起
+        if (btnLibClear != null) {
+            btnLibClear.setEnabled(has);
+            btnLibClear.setAlpha(has ? 1f : 0.35f);
         }
     }
 
@@ -1627,33 +1642,26 @@ public class MainActivity extends Activity {
                 });
     }
 
-    private void confirmClearLibrary() {
-        new AlertDialog.Builder(this)
-                .setTitle("清空曲库")
-                .setMessage("将删除全部曲目，歌单内容和最近播放也会一并清空。确定？")
-                .setPositiveButton("清空", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int w) {
-                        App.postBg(new Runnable() {
-                            @Override
-                            public void run() {
-                                Db.get(MainActivity.this).clearTracks();
-                                PlaybackService.clearQueue(MainActivity.this);
-                                App.runOnUi(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        exitLibSelectMode();
-                                        reloadAll();
-                                        Toast.makeText(MainActivity.this,
-                                                "曲库已清空", Toast.LENGTH_SHORT).show();
-                                    }
-                                });
-                            }
-                        });
-                    }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+    /** 勾选模式：全选当前列表所有曲目。 */
+    private void selectAllTracks() {
+        if (!libSelectMode || trackAdapter == null) return;
+        for (Track t : trackAdapter.data()) {
+            if (t.id != null) libSelected.add(t.id);
+        }
+        trackAdapter.setSelectable(libSelected);
+        updateLibSelCount();
+    }
+
+    /** 勾选模式：反选（已勾的取消、未勾的选中）。 */
+    private void invertSelectedTracks() {
+        if (!libSelectMode || trackAdapter == null) return;
+        for (Track t : trackAdapter.data()) {
+            if (t.id == null) continue;
+            if (libSelected.contains(t.id)) libSelected.remove(t.id);
+            else libSelected.add(t.id);
+        }
+        trackAdapter.setSelectable(libSelected);
+        updateLibSelCount();
     }
 
     private void playFrom(List<Track> list, int pos, long pid) {

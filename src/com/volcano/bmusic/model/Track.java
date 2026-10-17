@@ -76,6 +76,18 @@ public class Track implements Serializable {
         return sb.toString();
     }
 
+    /** 列表主标题：歌手 - 歌名；歌手未解析到写 Unknown。 */
+    public String listTitle() {
+        String a = (artist != null && !artist.isEmpty()) ? artist : "Unknown";
+        return a + " - " + displayTitle();
+    }
+
+    /** 列表副标题（小字）：专辑；未解析到写 Unknown。 */
+    public String listSub() {
+        if (album != null && !album.isEmpty()) return album;
+        return "Unknown";
+    }
+
     /** 是否已经推断过歌手/歌名。 */
     public boolean hasMeta() {
         return (artist != null && !artist.isEmpty()) || (song != null && !song.isEmpty());

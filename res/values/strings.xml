@@ -39,8 +39,10 @@
     <string name="menu_paste">粘贴链接添加</string>
     <string name="menu_manual">手动输入链接</string>
     <string name="lib_select">选择</string>
-    <string name="lib_clear">清空曲库</string>
+    <string name="lib_clear">删除</string>
     <string name="lib_delete_sel">删除选中</string>
+    <string name="lib_sel_all">全选</string>
+    <string name="lib_sel_inv">反选</string>
     <string name="lib_cancel_sel">取消</string>
     <string name="lib_selected">已选 %1$d / %2$d</string>
     <string name="scan_not_found">未安装扫码 App（如「条码扫描器」）。可去应用商店安装，或使用「粘贴链接添加」。</string>

@@ -170,6 +170,9 @@
 | 40 | 返回 B 站分 P 偏移修正 | v1.0.12 | `Bili` 解析 `page` 为 1 起算；`openBili` 用 `?p=page` 原样（去掉误加的 +1），多 P 视频准确定位对应分 P |
 | 41 | 删除曲目提示会同时删曲库/缓存 | v1.0.12 | `TrackActions.confirmDelete` / `QueueActivity` / `PlaylistActivity` 删除前弹「同时会从曲库删除，且本地缓存文件一并删除」 |
 | 42 | 导入时推断歌名/歌手/专辑 | v1.0.12 | `util/MetaResolver`：`parseLocal` 本地规则即时推断 + `enqueue` 单线程联网（网易云）校准；`Db` 增 `song/artist/album/srcTitle` 列；曲库可按歌手/专辑筛选、搜索与歌词用规范名 |
+| 43 | 勾选模式支持全选/反选 | v1.0.13 | 选择栏加「全选」「反选」按钮；`MainActivity.selectAllTracks()` / `invertSelectedTracks()` 基于 `trackAdapter.data()` 批量操作 `libSelected` 后 `setSelectable` 刷新 |
+| 44 | 删除全部按钮改为删除所选（灰度/亮起） | v1.0.13 | 头部 `btn_lib_clear` 由「清空曲库」改为 `deleteSelectedTracks`；`updateLibSelCount()` 按 `libSelected` 是否为空 `setEnabled` + `setAlpha(0.35/1.0)`；移除选择栏冗余删除按钮 |
+| 45 | 列表显示「歌手 - 歌名」+ 专辑小字 | v1.0.13 | `Track.listTitle()` = 歌手(空为 Unknown) + " - " + 歌名；`Track.listSub()` = 专辑(空为 Unknown)；`TrackAdapter` 列表行改用这两个方法（曲库/最近/歌单/队列一致） |
 
 ---
 
@@ -182,8 +185,9 @@
 - v1.0.10 在 Note8 验证：关网后播放逐首跳过并提示、整列表无缓存试完一轮停止（toast「整个列表都没有缓存，已停止播放」）；扫码预览正立不变形、相册识别回归通过；设置页无介绍文字、关于页正常（v1.0.10）；备份导出 Download/bmusic_backup_*.json 成功、删除曲目后恢复合并导入成功（2→3 首）；打开缓存文件夹弹路径兜底；小组件显示小圆钮+两行完整文字；
 - v1.0.11 在 Note8 验证：曲库多选 2 首→「加入播放队列」→播放页队列 1→3 首；队列页行菜单「删除曲目」→队列 3→2 首且曲库同步 2 首；多选 2 首→「加入歌单」→toast 已加入 2 首、歌单计数即时刷新为 2（重启前也一致，说明数据与 UI 同步）；小组件播放钮水平垂直居中；
 - v1.0.12 在 Note8 验证：①批量勾选 2 首→「加入歌单」→选择器含「新建歌单...」→新建「Mix」后提示已加入 2 首、歌单计数刷新；②歌单被播放后列表显示「正在播放」、歌单内当前曲目粉色高亮（`R.id.now` 图标 + 标题变粉）；③返回 B 站直接拉起 B 站 App、定位正确视频且分 P 正确（不再经浏览器）；④删除曲目弹窗含「同时会从曲库删除，本地缓存也一并删除」；⑤导入后曲库按歌手/专辑筛选可用，元信息识别正确（如「A20 LITE 'NEON' / A2O · NEON」）；`MetaResolver` 本地解析 9 例单测通过，联网校准在 429 时安全降级（parseLocal 已足够）；
+- v1.0.13 在 Note8 验证：①勾选模式点「全选」→「已选 249 / 249」全部打勾；再点「反选」→「已选 0 / 249」并保持在勾选模式；②未勾选时头部删除按钮置灰（alpha 0.35）且禁用，勾选后正常亮起；③列表主标题为「歌手 - 歌名」（如「梁静茹 - 从前的爱」），下方小字为专辑（如「燕尾蝶」），未解析到显示 `Unknown`；曲库/最近/歌单/队列共用 TrackAdapter 格式一致；
 - 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）。
 
 ---
 
-<p align="center"><sub>BMusic requirements · 更新于 v1.0.12</sub></p>
+<p align="center"><sub>BMusic requirements · 更新于 v1.0.13</sub></p>
