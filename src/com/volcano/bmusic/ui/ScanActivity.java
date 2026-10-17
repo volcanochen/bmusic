@@ -11,9 +11,11 @@ import android.graphics.Matrix;
 import android.hardware.Camera;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Toast;
 
 import com.volcano.bmusic.R;
@@ -27,6 +29,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 扫码添加：摄像头预览逐帧送 QrDecoder（离线纯 Java 解码），
  * 识别到链接后 setResult 返回 MainActivity 导入。
  * 另提供「从相册识别」入口（decodeImageUri 供 MainActivity 复用）。
+ *
+ * 方向处理：预览用 setDisplayOrientation 校正显示；解码用的 NV21 原始帧
+ * 按同样的角度旋转成"屏幕看到的样子"后再送解码器（四个方向逐一尝试）。
  */
 public class ScanActivity extends Activity implements SurfaceHolder.Callback {
 
@@ -36,6 +41,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
 
     private SurfaceView preview;
     private Camera camera;
+    private int displayOri = 90;   // setDisplayOrientation 的值
     private final AtomicBoolean busy = new AtomicBoolean(false);
     private final ExecutorService pool = Executors.newSingleThreadExecutor();
     private volatile boolean finished = false;
@@ -64,6 +70,34 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
 
     // ------------------------------------------------------------ camera
 
+    /** 预览应旋转的角度（传感器方向 - 屏幕旋转）。 */
+    private int computeDisplayOrientation() {
+        Camera.CameraInfo info = new Camera.CameraInfo();
+        int sensor = 90;
+        int facing = Camera.CameraInfo.CAMERA_FACING_BACK;
+        for (int i = 0; i < Camera.getNumberOfCameras(); i++) {
+            Camera.getCameraInfo(i, info);
+            if (info.facing == facing) {
+                sensor = info.orientation;
+                break;
+            }
+        }
+        int degrees;
+        switch (getWindowManager().getDefaultDisplay().getRotation()) {
+            case Surface.ROTATION_90: degrees = 90; break;
+            case Surface.ROTATION_180: degrees = 180; break;
+            case Surface.ROTATION_270: degrees = 270; break;
+            default: degrees = 0; break;
+        }
+        int r;
+        if (facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
+            r = (sensor + degrees) % 360;
+        } else {
+            r = (sensor - degrees + 360) % 360;
+        }
+        return r;
+    }
+
     private void openCamera() {
         if (hasCameraPermission() != 0) {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, REQ_CAM_PERM);
@@ -71,11 +105,16 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
         }
         try {
             camera = Camera.open();
+            displayOri = computeDisplayOrientation();
+            camera.setDisplayOrientation(displayOri);
             Camera.Parameters p = camera.getParameters();
             Camera.Size best = null;
             for (Camera.Size s : p.getSupportedPreviewSizes()) {
                 if (s.width > 1300) continue;
-                if (best == null || Math.abs(s.width - 960) < Math.abs(best.width - 960)) best = s;
+                if (best == null || Math.abs(s.width * s.height - 960 * 540)
+                        < Math.abs(best.width * best.height - 960 * 540)) {
+                    best = s;
+                }
             }
             if (best != null) p.setPreviewSize(best.width, best.height);
             try {
@@ -86,10 +125,42 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
             camera.setPreviewDisplay(preview.getHolder());
             camera.setPreviewCallback(previewCb);
             camera.startPreview();
+            fitPreview();
         } catch (Exception e) {
             Toast.makeText(this, "无法打开摄像头", Toast.LENGTH_LONG).show();
             finish();
         }
+    }
+
+    /** 把 SurfaceView 调成预览画面的宽高比（旋转后），居中 letterbox，避免拉伸变形。 */
+    private void fitPreview() {
+        if (camera == null) return;
+        final int w = preview.getWidth(), h = preview.getHeight();
+        if (w == 0 || h == 0) {
+            preview.post(new Runnable() {
+                @Override
+                public void run() {
+                    fitPreview();
+                }
+            });
+            return;
+        }
+        Camera.Size s = camera.getParameters().getPreviewSize();
+        double sar = (double) s.width / s.height;                // 传感器帧（横向）
+        double dar = (displayOri % 180 == 90) ? 1.0 / sar : sar; // 屏上显示比例
+        double car = (double) w / h;
+        int nw, nh;
+        if (dar > car) {   // 显示更宽：铺满宽、上下留黑
+            nw = w;
+            nh = (int) Math.round(w / dar);
+        } else {           // 更高：铺满高、左右留黑
+            nh = h;
+            nw = (int) Math.round(h * dar);
+        }
+        ViewGroup.LayoutParams lp = preview.getLayoutParams();
+        lp.width = nw;
+        lp.height = nh;
+        preview.setLayoutParams(lp);
     }
 
     private int hasCameraPermission() {
@@ -118,6 +189,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
             if (finished || !busy.compareAndSet(false, true)) return;
             Camera.Size s = cam.getParameters().getPreviewSize();
             final int w = s.width, h = s.height;
+            final int baseOri = displayOri;
             pool.execute(new Runnable() {
                 @Override
                 public void run() {
@@ -132,7 +204,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
                                 gray[dstRow + x] = data[srcRow + x * 2] & 0xFF;
                             }
                         }
-                        String text = QrDecoder.decode(gray, dw, dh);
+                        String text = decodeWithRotations(gray, dw, dh, baseOri);
                         if (text != null && !finished) {
                             finished = true;
                             returnResult(text);
@@ -145,6 +217,40 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
             });
         }
     };
+
+    /** 帧先按显示方向转，不行再试其余三个方向（每个角度内部含自适应二值化兜底）。 */
+    private static String decodeWithRotations(int[] gray, int w, int h, int baseOri) {
+        int[] cur = gray;
+        int cw = w, ch = h;
+        int rot = baseOri % 360;
+        for (int i = 0; i < 4; i++) {
+            String r = QrDecoder.decode(cur, cw, ch);
+            if (r != null) return r;
+            int[] rr = rotateGray(cur, cw, ch, true);
+            int t = cw;
+            cw = ch;
+            ch = t;
+            cur = rr;
+            rot = (rot + 90) % 360;
+        }
+        return null;
+    }
+
+    /** 顺时针旋转 90°，返回新数组，宽高互换。 */
+    private static int[] rotateGray(int[] g, int w, int h, boolean clockwise) {
+        int[] out = new int[g.length];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int v = g[y * w + x];
+                if (clockwise) {
+                    out[x * h + (h - 1 - y)] = v;
+                } else {
+                    out[(w - 1 - x) * h + y] = v;
+                }
+            }
+        }
+        return out;
+    }
 
     private void returnResult(String text) {
         runOnUiThread(new Runnable() {
@@ -181,6 +287,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+        fitPreview();
     }
 
     @Override
@@ -240,7 +347,8 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
     // ------------------------------------------------------- image decode
 
     /**
-     * 从图片 Uri 解二维码：按需降采样 → 依次尝试 0/90/180/270° 旋转。
+     * 从图片 Uri 解二维码：按需降采样 → 依次尝试 0/90/180/270° 旋转，
+     * 每个角度内部会用「全局阈值 + 自适应局部二值化」各试一遍（decode 内置）。
      * 供 ScanActivity 相册识别与 MainActivity 的「从相册识别」复用。
      */
     public static String decodeImageUri(Context c, Uri uri) {
@@ -255,20 +363,16 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
             int side = Math.max(o.outWidth, o.outHeight);
             while (side / (sample * 2) >= 900) sample *= 2;
 
-            for (int rot : new int[]{0, 90, 180, 270}) {
-                Bitmap bmp = loadSampled(c, uri, sample, rot);
-                if (bmp == null) return null;
-                String r = decodeBitmap(bmp);
-                bmp.recycle();
-                if (r != null) return r;
-            }
-            // 整体再缩小一档重试（二维码在小图里占比大时更稳）
-            for (int rot : new int[]{0, 90, 180, 270}) {
-                Bitmap bmp = loadSampled(c, uri, sample * 2, rot);
-                if (bmp == null) return null;
-                String r = decodeBitmap(bmp);
-                bmp.recycle();
-                if (r != null) return r;
+            int[] scales = {sample, sample * 2, 1};
+            for (int sc : scales) {
+                for (int rot : new int[]{0, 90, 180, 270}) {
+                    Bitmap bmp = loadSampled(c, uri, sc, rot);
+                    if (bmp == null) continue;
+                    String r = decodeBitmap(bmp);
+                    bmp.recycle();
+                    if (r != null) return r;
+                    if (sc == 1) break; // 原尺寸只试 0°，避免重复
+                }
             }
             return null;
         } catch (Throwable t) {
@@ -297,6 +401,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
 
     private static String decodeBitmap(Bitmap bmp) {
         int w = bmp.getWidth(), h = bmp.getHeight();
+        if (w * h > 2500000) return null;
         int[] px = new int[w * h];
         bmp.getPixels(px, 0, w, 0, 0, w, h);
         int[] gray = new int[w * h];

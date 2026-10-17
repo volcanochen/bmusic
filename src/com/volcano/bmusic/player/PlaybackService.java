@@ -23,6 +23,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.volcano.bmusic.App;
 import com.volcano.bmusic.R;
@@ -91,6 +92,8 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
     private int pendingSeek = -1;
     private int lastError = 0;
     private int retry = 0;
+    /** 离线播放轮询计数：连续跳过的未缓存曲目数（跑完一轮队列就停） */
+    private int offlineSkip = 0;
 
     private final Random rnd = new Random();
 
@@ -349,6 +352,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         if (ids != null) queueIds = new ArrayList<String>(ids);
         index = startId == null ? 0 : queueIds.indexOf(startId);
         if (index < 0) index = 0;
+        offlineSkip = 0;
         saveQueue();
         openIndex(index, autoplay);
     }
@@ -497,9 +501,50 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         }
     }
 
+    // ------------------------------------------------------- offline skip
+
+    private boolean isOffline() {
+        try {
+            android.net.ConnectivityManager cm = (android.net.ConnectivityManager)
+                    getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return true;
+            android.net.NetworkInfo ni = cm.getActiveNetworkInfo();
+            return ni == null || !ni.isConnected();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** 跳过当前未缓存曲目；整轮队列都跳过则停下。 */
+    private void skipOffline() {
+        offlineSkip++;
+        if (offlineSkip >= queueIds.size()) {
+            offlineSkip = 0;
+            pause();
+            toast("整个列表都没有缓存，已停止播放");
+        } else {
+            next(true);
+        }
+    }
+
+    private void toast(final String s) {
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(PlaybackService.this, s, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
     private void startSource(final String id) {
         Track t = cur;
         if (t == null || !t.id.equals(id)) return;
+        // 无网络且没缓存：提示后直接跳到下一首（整轮都没有就停）
+        if (!t.hasLocal() && isOffline()) {
+            toast("无网络，「" + t.playTitle() + "」未缓存，已跳过");
+            skipOffline();
+            return;
+        }
         initPlayer();
         try {
             mp.reset();
@@ -572,6 +617,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         public void onPrepared(MediaPlayer m) {
             loading = false;
             retry = 0;
+            offlineSkip = 0; // 成功起播，离线跳过计数归零
             mpReady = true;
             if (pendingSeek >= 0) {
                 try {
@@ -631,6 +677,12 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
             if (what == -38 || extra == -38) {
                 return true;
             }
+            // 无网络时重试在线流没有意义：直接跳到下一首有缓存的
+            if (cur != null && !cur.hasLocal() && isOffline()) {
+                toast("无网络，「" + cur.playTitle() + "」未缓存，已跳过");
+                skipOffline();
+                return true;
+            }
             lastError = what;
             if (cur != null && !cur.hasLocal() && retry < 3) {
                 retry++;
@@ -684,6 +736,12 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
 
     private void doPlay() {
         if (mp == null || !mpReady) return;
+        // 播放器已就绪也要复核：本地文件可能已被清理（离线时无法重取流）
+        if (cur != null && !cur.hasLocal() && isOffline()) {
+            toast("无网络，「" + cur.playTitle() + "」未缓存，已跳过");
+            skipOffline();
+            return;
+        }
         try {
             if (!playing) {
                 mp.start();

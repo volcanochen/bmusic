@@ -199,15 +199,32 @@
             android:textColor="@color/text_dim"
             android:textSize="12sp" />
 
-        <TextView
-            android:id="@+id/about"
+        <LinearLayout
+            android:id="@+id/btn_about"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="18dp"
+            android:layout_height="52dp"
+            android:layout_marginLeft="14dp"
+            android:layout_marginRight="14dp"
             android:layout_marginTop="14dp"
-            android:lineSpacingExtra="5dp"
-            android:text="BMusic v1.0.0\n将B站视频当作音乐：粘贴或分享链接即可加进曲库，支持后台播放、歌单、离线缓存。\n\n用法：在B站点分享 - 选择 BMusic；或复制链接后回曲库页点右上角加号粘贴。"
-            android:textColor="@color/text_dim"
-            android:textSize="11sp" />
+            android:background="@drawable/shape_card"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="14dp"
+            android:paddingRight="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="关于 BMusic"
+                android:textColor="@color/text"
+                android:textSize="14sp" />
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_next"
+                android:tint="@color/text_dim" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

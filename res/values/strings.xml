@@ -57,6 +57,7 @@
     <string name="ver_current">当前版本 %1$s</string>
     <string name="widget_play_pause">播放 / 暂停</string>
     <string name="widget_open_player">打开播放页</string>
+    <string name="widget_not_playing">未在播放</string>
     <string name="back">返回</string>
     <string name="scan_title">扫码添加</string>
     <string name="scan_hint">对准二维码自动识别；也可以从相册选一张含二维码的图片</string>

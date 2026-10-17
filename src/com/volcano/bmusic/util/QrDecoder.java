@@ -131,9 +131,19 @@ public final class QrDecoder {
 
     /** Decode a grayscale image (0=black .. 255=white) to text, or null. */
     public static String decode(int[] gray, int w, int h) {
+        String r = decodeOnce(gray, w, h, false);
+        if (r == null && gray != null && w > 0 && h > 0) {
+            // 拍照/截图光照不均时全局阈值会失真，换自适应局部二值化再试一次
+            r = decodeOnce(gray, w, h, true);
+        }
+        return r;
+    }
+
+    private static String decodeOnce(int[] gray, int w, int h, boolean adaptive) {
         try {
             if (gray == null || w <= 0 || h <= 0) return null;
-            boolean[][] bin = binarize(gray, w, h);
+            boolean[][] bin = adaptive
+                    ? binarizeAdaptive(gray, w, h) : binarize(gray, w, h);
             if (DEBUG && w > 200) {
                 int x0 = 30, y0 = 30, sz = 120;
                 StringBuilder sb = new StringBuilder("DBG bin crop (TL region):\n");
@@ -219,6 +229,35 @@ public final class QrDecoder {
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
                 b[y][x] = gray[y * w + x] < thr;
+        return b;
+    }
+
+    /** 自适应局部二值化：积分图 + 窗口均值 - 15% 余量，抗光照不均。 */
+    private static boolean[][] binarizeAdaptive(int[] gray, int w, int h) {
+        long[] sum = new long[(w + 1) * (h + 1)];
+        for (int y = 0; y < h; y++) {
+            long rowSum = 0;
+            for (int x = 0; x < w; x++) {
+                rowSum += gray[y * w + x];
+                sum[(y + 1) * (w + 1) + (x + 1)] = sum[y * (w + 1) + (x + 1)] + rowSum;
+            }
+        }
+        int win = Math.max(15, Math.min(w, h) / 8) | 1;
+        int half = win / 2;
+        boolean[][] b = new boolean[h][w];
+        for (int y = 0; y < h; y++) {
+            int y0 = Math.max(0, y - half), y1 = Math.min(h - 1, y + half);
+            for (int x = 0; x < w; x++) {
+                int x0 = Math.max(0, x - half), x1 = Math.min(w - 1, x + half);
+                long area = (long) (x1 - x0 + 1) * (y1 - y0 + 1);
+                long s = sum[(y1 + 1) * (w + 1) + (x1 + 1)]
+                        - sum[y0 * (w + 1) + (x1 + 1)]
+                        - sum[(y1 + 1) * (w + 1) + x0]
+                        + sum[y0 * (w + 1) + x0];
+                int mean = (int) (s / area);
+                b[y][x] = gray[y * w + x] < mean - mean / 7;
+            }
+        }
         return b;
     }
 

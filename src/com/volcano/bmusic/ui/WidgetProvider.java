@@ -7,15 +7,18 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
+import android.util.TypedValue;
 import android.widget.RemoteViews;
 
 import com.volcano.bmusic.R;
+import com.volcano.bmusic.model.Track;
 import com.volcano.bmusic.player.PlaybackService;
 
 /**
- * 2x2 桌面小组件：一个大号播放/暂停圆钮。
- * 点圆钮切换播放/暂停；点圆钮以外的空间（边框与四角）进入播放页。
- * 图标状态由服务的 ACT_STATE 广播实时同步（正在播显示暂停图标）。
+ * 2x2 桌面小组件：播放/暂停圆钮 + 歌名/歌手两行信息。
+ * 点圆钮切换播放/暂停；点其他空间（按钮与文字外）进入播放页。
+ * 图标与文字由服务的 ACT_STATE 广播实时同步；文字按长度分档缩放，
+ * 保证每行至少 8 个字不出现省略号。
  */
 public class WidgetProvider extends AppWidgetProvider {
 
@@ -45,12 +48,34 @@ public class WidgetProvider extends AppWidgetProvider {
     private static RemoteViews build(Context c) {
         PlaybackService svc = PlaybackService.get();
         boolean playing = svc != null && svc.isPlaying();
+        Track cur = svc != null ? svc.current() : null;
+        String title = cur != null ? cur.playTitle() : c.getString(R.string.widget_not_playing);
+        String sub = cur != null ? cur.subTitle() : c.getString(R.string.app_name);
+
         RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.widget_play);
         rv.setOnClickPendingIntent(R.id.widget_root, openPi(c));
         rv.setOnClickPendingIntent(R.id.widget_toggle, togglePi(c));
         rv.setImageViewResource(R.id.widget_toggle,
                 playing ? R.drawable.ic_pause : R.drawable.ic_play);
+        rv.setTextViewText(R.id.widget_title, title);
+        rv.setTextViewText(R.id.widget_sub, sub);
+        // 字号自适应：保证 8 个全角字符能完整显示，不出现 "..."
+        fitText(rv, R.id.widget_title, title, 15f, 9f);
+        fitText(rv, R.id.widget_sub, sub, 12f, 8f);
         return rv;
+    }
+
+    /** 按文本长度给 RemoteViews 里的 TextView 选字号。 */
+    private static void fitText(RemoteViews rv, int id, String s, float max, float min) {
+        int len = s == null ? 0 : s.length();
+        float sp;
+        if (len <= 6) sp = max;
+        else if (len <= 8) sp = max - 1f;
+        else if (len <= 10) sp = max - 2f;
+        else if (len <= 12) sp = min + 2f;
+        else if (len <= 15) sp = min + 1f;
+        else sp = min;
+        rv.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, sp);
     }
 
     private static void refreshAll(Context c) {

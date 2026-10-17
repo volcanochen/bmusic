@@ -2,6 +2,7 @@ package com.volcano.bmusic.ui;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -42,6 +43,12 @@ public class SettingsActivity extends Activity {
             public void onClick(View v) {
                 save();
                 finish();
+            }
+        });
+        findViewById(R.id.btn_about).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(SettingsActivity.this, AboutActivity.class));
             }
         });
         swAuto.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {

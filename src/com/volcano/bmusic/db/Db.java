@@ -189,6 +189,47 @@ public class Db extends SQLiteOpenHelper {
         }
     }
 
+    // -------------------------------------------------------------- backup
+
+    /** 全部播放历史 {tid(String), played(Long)}，按时间升序。 */
+    public synchronized ArrayList<Object[]> historyAll() {
+        SQLiteDatabase d = getReadableDatabase();
+        Cursor c = null;
+        ArrayList<Object[]> out = new ArrayList<Object[]>();
+        try {
+            c = d.rawQuery("SELECT tid, played FROM history ORDER BY played ASC", null);
+            while (c.moveToNext()) out.add(new Object[]{c.getString(0), c.getLong(1)});
+        } catch (Exception ignored) {
+        } finally {
+            if (c != null) c.close();
+        }
+        return out;
+    }
+
+    public synchronized void insertHistory(String tid, long played) {
+        ContentValues hv = new ContentValues();
+        hv.put("tid", tid);
+        hv.put("played", played);
+        getWritableDatabase().insert("history", null, hv);
+    }
+
+    /** 全部歌单元数据 {id(Long), name(String), created(Long), kind(Integer)}。 */
+    public synchronized ArrayList<Object[]> playlistsFull() {
+        SQLiteDatabase d = getReadableDatabase();
+        Cursor c = null;
+        ArrayList<Object[]> out = new ArrayList<Object[]>();
+        try {
+            c = d.rawQuery("SELECT id, name, created, kind FROM playlists ORDER BY created ASC", null);
+            while (c.moveToNext()) {
+                out.add(new Object[]{c.getLong(0), c.getString(1), c.getLong(2), c.getInt(3)});
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (c != null) c.close();
+        }
+        return out;
+    }
+
     public synchronized void deleteTrack(String id) {
         SQLiteDatabase d = getWritableDatabase();
         d.delete("tracks", "id=?", new String[]{id});

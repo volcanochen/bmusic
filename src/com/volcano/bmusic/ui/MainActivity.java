@@ -486,6 +486,47 @@ public class MainActivity extends Activity {
                         .setNegativeButton("取消", null).show();
             }
         });
+        // 数据备份 / 恢复 / 打开缓存文件夹
+        View btnBackup = findViewById(R.id.btn_backup);
+        if (btnBackup != null) {
+            btnBackup.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    doBackup();
+                }
+            });
+        }
+        View btnRestore = findViewById(R.id.btn_restore);
+        if (btnRestore != null) {
+            btnRestore.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                    i.setType("*/*");
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    try {
+                        startActivityForResult(
+                                Intent.createChooser(i, "选择备份 JSON 文件"), REQ_RESTORE);
+                    } catch (ActivityNotFoundException e) {
+                        Toast.makeText(MainActivity.this,
+                                "没有可用的文件选择器", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        }
+        View btnOpenCache = findViewById(R.id.btn_open_cache);
+        if (btnOpenCache != null) {
+            btnOpenCache.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    com.volcano.bmusic.util.Backup.openFolder(MainActivity.this);
+                }
+            });
+            TextView tvPath = (TextView) findViewById(R.id.tv_cache_path);
+            if (tvPath != null) {
+                tvPath.setText(com.volcano.bmusic.util.Cache.audioDir(this).getAbsolutePath());
+            }
+        }
         mini.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -504,6 +545,58 @@ public class MainActivity extends Activity {
                 PlaybackService.next(MainActivity.this);
             }
         });
+    }
+
+    // ------------------------------------------------------------- backup
+
+    private void doBackup() {
+        if (android.os.Build.VERSION.SDK_INT <= 28
+                && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    REQ_WRITE_PERM);
+            return;
+        }
+        Toast.makeText(this, "正在导出…", Toast.LENGTH_SHORT).show();
+        App.postBg(new Runnable() {
+            @Override
+            public void run() {
+                String json = com.volcano.bmusic.util.Backup.export(MainActivity.this);
+                String path = null, err = null;
+                if (json != null) {
+                    try {
+                        path = com.volcano.bmusic.util.Backup.write(MainActivity.this, json);
+                    } catch (Exception e) {
+                        err = e.getMessage();
+                    }
+                }
+                final String fPath = path, fErr = err;
+                App.runOnUi(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (fPath != null) {
+                            Toast.makeText(MainActivity.this,
+                                    "已备份到 " + fPath, Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(MainActivity.this,
+                                    "备份失败：" + fErr, Toast.LENGTH_LONG).show();
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] perms, int[] results) {
+        super.onRequestPermissionsResult(code, perms, results);
+        if (code == REQ_WRITE_PERM) {
+            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+                doBackup();
+            } else {
+                Toast.makeText(this, "没有存储权限，无法备份", Toast.LENGTH_LONG).show();
+            }
+        }
     }
 
     private void askNotify() {
@@ -1123,11 +1216,52 @@ public class MainActivity extends Activity {
 
     private static final int REQ_SCAN = 9001;
     private static final int REQ_IMG = 9002;
+    private static final int REQ_RESTORE = 9003;
+    private static final int REQ_WRITE_PERM = 78;
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode != RESULT_OK || data == null) return;
+        if (requestCode == REQ_RESTORE) {
+            Uri ruri = data.getData();
+            if (ruri == null) return;
+            String json = null;
+            try {
+                java.io.InputStream is = getContentResolver().openInputStream(ruri);
+                json = Http.readAll(is);
+                is.close();
+            } catch (Exception e) {
+                json = null;
+            }
+            final String fjson = json;
+            if (TextUtils.isEmpty(fjson)) {
+                Toast.makeText(this, "读取备份文件失败", Toast.LENGTH_LONG).show();
+                return;
+            }
+            App.postBg(new Runnable() {
+                @Override
+                public void run() {
+                    final int n = com.volcano.bmusic.util.Backup.restore(MainActivity.this, fjson);
+                    App.runOnUi(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (n < 0) {
+                                Toast.makeText(MainActivity.this,
+                                        "不是有效的 BMusic 备份文件", Toast.LENGTH_LONG).show();
+                            } else {
+                                reloadAll();
+                                Toast.makeText(MainActivity.this,
+                                        n > 0 ? ("已导入 " + n + " 首曲目")
+                                              : "备份内容已存在，未新增曲目",
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        }
+                    });
+                }
+            });
+            return;
+        }
         String text = data.getStringExtra(ScanActivity.EXTRA_TEXT);
         if (TextUtils.isEmpty(text) && requestCode == REQ_IMG) {
             Uri uri = data.getData();
