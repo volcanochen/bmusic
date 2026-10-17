@@ -152,6 +152,10 @@
 | 22 | 最近与我的拆分 | v1.0.8 | 四 tab 导航 |
 | 23 | 应用内更新（GitHub 直链） | v1.0.8 | DownloadManager + 安装器拉起 |
 | 24 | 桌面 2×2 播放/暂停小组件（点空白进播放页） | v1.0.9 | `WidgetProvider` + ACT_STATE 同步图标；toggle 用 getForegroundService 绕过后台启动限制 |
+| 25 | 扫码添加（摄像头扫码 + 相册图片识别，离线） | v1.0.9 | `util/QrDecoder` 纯 Java 解码（v1-10、RS纠错/BCH format/zigzag，12/12 测试通过）；`ui/ScanActivity` 相机逐帧解码 + `decodeImageUri` 四向旋转重试 |
+| 26 | 粘贴链接快速添加 | v1.0.9 | 「+」来源菜单第一项直接读剪贴板 → `doImport` |
+| 27 | 曲库批量：多选删除 / 一键清空 | v1.0.9 | 复用 `TrackAdapter.setSelectable` 多选；`Db.deleteTrack` 批删 + `removeIds`；`Db.clearTracks` + `clearQueue` |
+| 28 | 检查更新（版本比对 + 介绍页） | v1.0.9 | 拉 `release/version.json` 比对 versionCode → `UpdateActivity` 介绍页 / 「已是最新」提示 |
 
 ---
 
@@ -160,6 +164,7 @@
 - **全部需求**均已在真机（OPPO N6 Android 16 / Samsung Note8 Android 9）完成功能验证；
 - v1.0.7「返回 B 站」在 Note8 上验证菜单项与跳转；v1.0.8 的八项（自动缓存/歌词过滤/布局重排/队列批量操作/四页导航/应用更新）在 Note8 验证，更新链路实测到系统安装器弹出；
 - v1.0.9 桌面小组件已在 Note8 验证：添加到桌面、按钮播放/暂停切换（`dumpsys media_session` state 2↔3）、图标随 ACT_STATE 同步、点按钮外空间打开播放页且播放不间断；
+- v1.0.9 其余各项 Note8 验证：相册识别二维码→导入成功（BV1xx411c7mD）、多选勾选（已选 1/3）→删除→曲目移除（3→2首）、清空确认框、扫码页+相机权限+实时预览、检查更新显示「已是最新 v1.0.9」（真机拉取线上 version.json）；
 - 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）。
 
 ---
