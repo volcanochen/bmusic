@@ -63,5 +63,7 @@
     <string name="scan_hint">对准二维码自动识别；也可以从相册选一张含二维码的图片</string>
     <string name="scan_gallery">从相册识别</string>
     <string name="scan_no_qr">未在图片中识别到二维码</string>
+    <string name="lib_queue_sel">加入播放队列</string>
+    <string name="lib_pl_sel">加入歌单</string>
     <string name="menu_pick_image">从相册识别</string>
 </resources>

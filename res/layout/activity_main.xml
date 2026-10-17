@@ -79,6 +79,42 @@
                     android:textColor="@color/pink"
                     android:textSize="13sp" />
 
+                <Button
+                    android:id="@+id/btn_lib_queue_sel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="30dp"
+                    android:layout_marginLeft="4dp"
+                    android:background="@drawable/ripple_round"
+                    android:contentDescription="@string/lib_queue_sel"
+                    android:gravity="center"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:text="@string/lib_queue_sel"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+
+                <Button
+                    android:id="@+id/btn_lib_pl_sel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="30dp"
+                    android:layout_marginLeft="4dp"
+                    android:background="@drawable/ripple_round"
+                    android:contentDescription="@string/lib_pl_sel"
+                    android:gravity="center"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:text="@string/lib_pl_sel"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+
                 <ImageButton
                     android:id="@+id/btn_lib_del_sel"
                     android:layout_width="44dp"

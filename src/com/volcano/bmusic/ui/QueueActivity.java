@@ -241,7 +241,15 @@ public class QueueActivity extends Activity {
                         Toast.makeText(QueueActivity.this, "已从队列移除", Toast.LENGTH_SHORT).show();
                         break;
                     case 7:
-                        TrackActions.confirmDelete(QueueActivity.this, track, null);
+                        TrackActions.confirmDelete(QueueActivity.this, track, new Runnable() {
+                            @Override
+                            public void run() {
+                                // 从曲库删除的同时把队列里的这条也去掉并刷新
+                                ArrayList<String> one = new ArrayList<String>();
+                                one.add(track.id);
+                                PlaybackService.removeIds(QueueActivity.this, one);
+                            }
+                        });
                         break;
                 }
             }

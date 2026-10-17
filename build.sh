@@ -36,7 +36,7 @@ echo "== 2/7 link apk =="
   -o "$OUT/app.apk" \
   --java "$GEN" \
   --min-sdk-version 24 --target-sdk-version 34 \
-  --version-code 11 --version-name "1.0.10" \
+  --version-code 12 --version-name "1.0.11" \
   -A "$ROOT/assets" \
   "${RESZIPS[@]}"
 
@@ -51,10 +51,12 @@ find "$SRC" "$GEN" -name "*.java" > "$OUT/sources.txt"
 
 echo "== 4/7 dex =="
 rm -rf "$BIN"; mkdir -p "$BIN"
-mapfile -t CLASSES < <(find "$OBJ" -name "*.class")
+# class 文件先打成 jar 再喂 d8，避免 class 文件增多后命令行超长
+rm -f "$OUT/classes.jar"
+"$JDKDIR/jar.exe" cf "$OUT/classes.jar" -C "$OBJ" .
 "$JAVA" -cp "$BT/lib/d8.jar" com.android.tools.r8.D8 \
   --release --lib "$PL" --min-api 24 \
-  --output "$BIN" "${CLASSES[@]}"
+  --output "$BIN" "$OUT/classes.jar"
 
 echo "== 5/7 pack dex into apk =="
 if [ ! -f "$ROOT/debug.keystore" ]; then

@@ -161,6 +161,9 @@
 | 31 | 设置页介绍文字移至独立关于页 | v1.0.10 | `AboutActivity`：图标/版本/介绍/三种添加方式/开源地址（长按复制）；设置页改为一行入口 |
 | 32 | 数据备份/恢复 + 打开缓存文件夹 | v1.0.10 | `util/Backup`：导出 JSON（曲目+歌单+历史）到 Download（API29+ MediaStore，≤28 直写+权限）；恢复为合并语义（已有不覆盖，恢复后视为未缓存）；`openFolder` ACTION_VIEW resource/folder → 兜底弹路径+复制 |
 | 33 | 小组件两行歌曲信息自适应 | v1.0.10 | 播放钮缩至 62dp；歌名/歌手两行 `setTextViewTextSize` 按长度分档（15→9sp），保证 ≥8 字不省略 |
+| 34 | 播放队列可删除曲目（删除后同时移出队列） | v1.0.11 | `QueueActivity` 行菜单「删除曲目」传入 after 回调：`Db.deleteTrack` 后 `PlaybackService.removeIds`，服务广播触发列表刷新（此前只删曲库、队列不变，看起来像没反应） |
+| 35 | 曲库多选批量加入播放队列 / 加入歌单 | v1.0.11 | 选择栏加「加入播放队列」「加入歌单」文字按钮（选中才显示）；队列走新增 `A_APPEND_IDS`（批量 append，不打乱当前播放）；歌单 `Db.addTo` 逐条插入 + `reloadPlaylists()` 即时刷新计数 |
+| 36 | 桌面小组件播放钮居中 | v1.0.11 | 根布局 `gravity` 由 `center_vertical` 改 `center`（垂直布局下才带水平居中），FrameLayout 加 `layout_gravity=center_horizontal` |
 
 ---
 
@@ -171,8 +174,9 @@
 - v1.0.9 桌面小组件已在 Note8 验证：添加到桌面、按钮播放/暂停切换（`dumpsys media_session` state 2↔3）、图标随 ACT_STATE 同步、点按钮外空间打开播放页且播放不间断；
 - v1.0.9 其余各项 Note8 验证：相册识别二维码→导入成功（BV1xx411c7mD）、多选勾选（已选 1/3）→删除→曲目移除（3→2首）、清空确认框、扫码页+相机权限+实时预览、检查更新显示「已是最新 v1.0.9」（真机拉取线上 version.json）；
 - v1.0.10 在 Note8 验证：关网后播放逐首跳过并提示、整列表无缓存试完一轮停止（toast「整个列表都没有缓存，已停止播放」）；扫码预览正立不变形、相册识别回归通过；设置页无介绍文字、关于页正常（v1.0.10）；备份导出 Download/bmusic_backup_*.json 成功、删除曲目后恢复合并导入成功（2→3 首）；打开缓存文件夹弹路径兜底；小组件显示小圆钮+两行完整文字；
+- v1.0.11 在 Note8 验证：曲库多选 2 首→「加入播放队列」→播放页队列 1→3 首；队列页行菜单「删除曲目」→队列 3→2 首且曲库同步 2 首；多选 2 首→「加入歌单」→toast 已加入 2 首、歌单计数即时刷新为 2（重启前也一致，说明数据与 UI 同步）；小组件播放钮水平垂直居中；
 - 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）。
 
 ---
 
-<p align="center"><sub>BMusic requirements · 更新于 v1.0.9</sub></p>
+<p align="center"><sub>BMusic requirements · 更新于 v1.0.11</sub></p>

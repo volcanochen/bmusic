@@ -114,6 +114,8 @@ public class MainActivity extends Activity {
     private java.util.HashSet<String> libSelected = new java.util.HashSet<String>();
     private boolean libSelectMode = false;
     private View btnLibSelect;
+    private View btnLibQueueSel;
+    private View btnLibPlSel;
     private View btnLibClear;
     private View btnLibDelSel;
     private View btnLibCancel;
@@ -238,6 +240,8 @@ public class MainActivity extends Activity {
         btnLibClear = findViewById(R.id.btn_lib_clear);
         btnLibDelSel = findViewById(R.id.btn_lib_del_sel);
         btnLibCancel = findViewById(R.id.btn_lib_cancel_sel);
+        btnLibQueueSel = findViewById(R.id.btn_lib_queue_sel);
+        btnLibPlSel = findViewById(R.id.btn_lib_pl_sel);
         libSelBar = findViewById(R.id.lib_sel_bar);
         tvLibSel = (TextView) findViewById(R.id.tv_lib_sel);
         tvUpdate = (TextView) findViewById(R.id.tv_update);
@@ -418,6 +422,22 @@ public class MainActivity extends Activity {
                 @Override
                 public void onClick(View v) {
                     deleteSelectedTracks();
+                }
+            });
+        }
+        if (btnLibQueueSel != null) {
+            btnLibQueueSel.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    queueSelectedTracks();
+                }
+            });
+        }
+        if (btnLibPlSel != null) {
+            btnLibPlSel.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    addSelectedToPlaylist();
                 }
             });
         }
@@ -1334,6 +1354,12 @@ public class MainActivity extends Activity {
         if (btnLibDelSel != null) {
             btnLibDelSel.setVisibility(has ? View.VISIBLE : View.GONE);
         }
+        if (btnLibQueueSel != null) {
+            btnLibQueueSel.setVisibility(has ? View.VISIBLE : View.GONE);
+        }
+        if (btnLibPlSel != null) {
+            btnLibPlSel.setVisibility(has ? View.VISIBLE : View.GONE);
+        }
         if (btnLibCancel != null) {
             btnLibCancel.setVisibility(has ? View.VISIBLE : View.GONE);
         }
@@ -1388,6 +1414,79 @@ public class MainActivity extends Activity {
                 })
                 .setNegativeButton("取消", null)
                 .show();
+    }
+
+    /** 勾选曲目按顺序批量加入播放队列（不打断当前播放）。 */
+    private void queueSelectedTracks() {
+        if (libSelected.isEmpty()) {
+            Toast.makeText(this, "请先勾选曲目", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final ArrayList<String> ids = new ArrayList<String>(libSelected);
+        PlaybackService.appendAll(this, ids);
+        exitLibSelectMode();
+        Toast.makeText(this, "已加入队列 " + ids.size() + " 首", Toast.LENGTH_SHORT).show();
+    }
+
+    /** 勾选曲目批量加入歌单：先选歌单。 */
+    private void addSelectedToPlaylist() {
+        if (libSelected.isEmpty()) {
+            Toast.makeText(this, "请先勾选曲目", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        App.postBg(new Runnable() {
+            @Override
+            public void run() {
+                final ArrayList<Object[]> pls = Db.get(MainActivity.this).playlistsFull();
+                App.runOnUi(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (pls.isEmpty()) {
+                            Toast.makeText(MainActivity.this,
+                                    "还没有歌单，请先在歌单页新建", Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        final String[] names = new String[pls.size()];
+                        for (int i = 0; i < pls.size(); i++) {
+                            names[i] = (String) pls.get(i)[1];
+                        }
+                        new AlertDialog.Builder(MainActivity.this)
+                                .setTitle("加入歌单（" + libSelected.size() + " 首）")
+                                .setItems(names, new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface d, int which) {
+                                        final long pid = (Long) pls.get(which)[0];
+                                        final String pname = names[which];
+                                        final ArrayList<String> ids =
+                                                new ArrayList<String>(libSelected);
+                                        App.postBg(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                for (String tid : ids) {
+                                                    Db.get(MainActivity.this).addTo(pid, tid);
+                                                }
+                                                libSelected.clear();
+                                                App.runOnUi(new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        exitLibSelectMode();
+                                                        reloadPlaylists();
+                                                        Toast.makeText(MainActivity.this,
+                                                                "已加入歌单「" + pname + "」"
+                                                                        + ids.size() + " 首",
+                                                                Toast.LENGTH_LONG).show();
+                                                    }
+                                                });
+                                            }
+                                        });
+                                    }
+                                })
+                                .setNegativeButton("取消", null)
+                                .show();
+                    }
+                });
+            }
+        });
     }
 
     private void confirmClearLibrary() {

@@ -53,6 +53,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
     public static final String A_STOP = "bm.a.stop";
     public static final String A_SEEK = "bm.a.seek";
     public static final String A_APPEND = "bm.a.append";
+    public static final String A_APPEND_IDS = "bm.a.append_ids";
     public static final String A_OPEN = "bm.a.open";
     public static final String A_QUEUE = "bm.a.queue";
     public static final String A_MODE = "bm.a.mode";
@@ -160,6 +161,37 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
                 clearQueue();
             } else if (A_QUEUE_RM_IDS.equals(a)) {
                 removeIds(intent.getStringArrayListExtra("ids"));
+            } else if (A_APPEND_IDS.equals(a)) {
+                ArrayList<String> ids = intent.getStringArrayListExtra("ids");
+                if (ids != null && !ids.isEmpty()) {
+                    boolean wasIdle = (cur == null);
+                    for (String id : ids) {
+                        if (id != null && !queueIds.contains(id)) queueIds.add(id);
+                    }
+                    if (wasIdle) {
+                        String first = ids.get(0);
+                        if (queueIds.contains(first)) {
+                            index = queueIds.indexOf(first);
+                            Track t0 = Db.get(this).get(first);
+                            if (t0 != null) {
+                                cur = t0;
+                                App.prefs().edit().putString("last_id", first).apply();
+                                retry = 0;
+                                loading = true;
+                                startWhenReady = false; // 只加载不自动播
+                                broadcastState();
+                                refreshNotify();
+                                requestFocus(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        startSource(cur.id);
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    saveQueue();
+                }
         } else if (A_APPEND.equals(a)) {
             String id = intent.getStringExtra("id");
             if (id == null) return START_STICKY;
@@ -1184,6 +1216,14 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         Intent i = new Intent(c, PlaybackService.class);
         i.setAction(A_APPEND);
         i.putExtra("id", id);
+        start(c, i);
+    }
+
+    /** 批量加入播放队列（按顺序追加，不打断当前播放）。 */
+    public static void appendAll(Context c, ArrayList<String> ids) {
+        Intent i = new Intent(c, PlaybackService.class);
+        i.setAction(A_APPEND_IDS);
+        i.putStringArrayListExtra("ids", ids);
         start(c, i);
     }
 
