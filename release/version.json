@@ -1,6 +1,6 @@
 {
-  "versionCode": 15,
-  "versionName": "1.0.14",
-  "notes": "1.修复导入歌曲的歌名/歌手/专辑解析错误：合集「序号. 歌名 - 歌手」不再整条颠倒\n2.联网校准仅补专辑、绝不再覆盖歌名和歌手，避免张冠李戴（对不上就显示 Unknown）\n3.存量曲目首次启动自动按标题重推一次（backfill v4），列表恢复「歌手 - 歌名 / 专辑」",
+  "versionCode": 16,
+  "versionName": "1.0.15",
+  "notes": "1.专辑校准源由网易云换成 QQ 音乐：网易云翻唱太多、专辑常是合集名；QQ 音乐返回真实发行专辑（如「路」→《丝路》）\n2.升级后首次启动自动清空旧专辑并重新联网补齐（backfill v5）\n3.门控不变：歌名一致 + 歌手对得上才采纳，否则显示 Unknown，绝不张冠李戴",
   "url": "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk"
 }

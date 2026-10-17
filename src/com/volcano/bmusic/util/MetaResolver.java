@@ -18,8 +18,10 @@ import java.util.concurrent.Executors;
  * <ol>
  *   <li>{@link #parseLocal} 纯本地规则，导入时立即执行（不联网、不阻塞），
  *       处理「【歌手】歌名」「歌手 - 歌名」「01. 歌名」这类常见写法；</li>
- *   <li>{@link #enqueue} 联网用网易云搜索接口校准（歌手/专辑/规范歌名），
- *       走单线程队列，批量导入时不会同时发一堆请求；结果写库并广播刷新。</li>
+ *   <li>{@link #enqueue} 联网用 QQ 音乐搜索接口补**专辑**（真实发行专辑名），
+ *       走单线程队列，批量导入时不会同时发一堆请求；结果写库并广播刷新。
+ *       （改用 QQ 音乐原因：网易云搜索返回大量翻唱，专辑字段常是合集名；
+ *       百度百科则有 JS 反爬校验，纯 HTTP 拿不到。）</li>
  * </ol>
  */
 public final class MetaResolver {
@@ -293,13 +295,14 @@ public final class MetaResolver {
 
     /**
      * 一次性补齐历史曲目：老版本导入的歌只有 B 站标题，没有歌手/专辑。
-     * 每个安装只跑一次（pref 记标记），逐个本地解析 + 联网校准。
+     * 每个安装只跑一次（pref 记标记），逐个本地解析 + 联网补专辑。
+     * v5：清空网易云时代可能错误的专辑，重推标题后用 QQ 音乐重新补齐。
      */
     public static void backfill(final Context c) {
         if (c == null) return;
         final Context app = c.getApplicationContext();
-        if (com.volcano.bmusic.App.prefs().getBoolean("meta_backfill_v4", false)) return;
-        com.volcano.bmusic.App.prefs().edit().putBoolean("meta_backfill_v4", true).apply();
+        if (com.volcano.bmusic.App.prefs().getBoolean("meta_backfill_v5", false)) return;
+        com.volcano.bmusic.App.prefs().edit().putBoolean("meta_backfill_v5", true).apply();
         QUEUE.execute(new Runnable() {
             @Override
             public void run() {
@@ -307,7 +310,9 @@ public final class MetaResolver {
                     List<Track> all = Db.get(app).allTracks();
                     int changed = 0;
                     for (Track t : all) {
-                        // 用标题重新推导（修正旧版「歌名-歌手」颠倒），不清已有专辑
+                        // 先清专辑（可能来自网易云的错误结果），再用标题重推歌名/歌手；
+                        // 标题里明确写了「专辑：xxx」的会在此恢复
+                        t.album = "";
                         parseLocal(t, true);
                         Db.get(app).setMeta(t.id, t.song, t.artist, t.album);
                         changed++;
@@ -318,7 +323,7 @@ public final class MetaResolver {
                         i.putExtra("n", changed);
                         app.sendBroadcast(i);
                     }
-                    // 联网补空专辑：节流 400ms，连续 3 次请求失败（疑似限流）即停
+                    // 联网补专辑：节流 400ms，连续 3 次请求失败（疑似限流）即停
                     int fail = 0;
                     for (Track t : all) {
                         if (t.album != null && !t.album.trim().isEmpty()) continue;
@@ -341,9 +346,9 @@ public final class MetaResolver {
     }
 
     /**
-     * 用网易云搜索**只补专辑**：绝不改歌名/歌手。标题已经足够可靠，
-     * 联网只做锦上添花；候选必须「歌名高度一致 + 歌手对得上」才采纳，
-     * 否则宁可留空（列表显示 Unknown），也不张冠李戴。
+     * 联网补专辑：查询 QQ 音乐，只取真实发行专辑名。绝不改歌名/歌手。
+     * 候选必须「歌名一致 + 歌手对得上」才采纳，否则宁可留空（列表显示 Unknown），
+     * 也不张冠李戴。网易云搜索翻唱太多且专辑常是合集名，已弃用。
      *
      * @return 1 补到专辑；0 没匹配到；-1 请求失败（疑似限流）
      */
@@ -355,41 +360,83 @@ public final class MetaResolver {
         // 已有专辑就不必再请求
         if (t.album != null && !t.album.trim().isEmpty()) return 0;
 
-        String ns = norm(song);
-        String na = norm(artist);
-        String query = (!artist.isEmpty() && !ns.contains(na)) ? (artist + " " + song) : song;
-        if (query.isEmpty()) query = song;
+        String album = qqAlbum(song, artist);
+        if (album == null) return -1;                       // 请求失败 / 限流
+        if (album.isEmpty()) return 0;                      // 没匹配到
 
-        List<NeteaseLyric.Song> hits = NeteaseLyric.searchNow(query);
-        if (hits == null) return -1;                       // 请求失败 / 限流
-        if (hits.isEmpty() && !query.equals(song)) {
-            hits = NeteaseLyric.searchNow(song);
-            if (hits == null) return -1;
-        }
-        if (hits.isEmpty()) return 0;
-
-        NeteaseLyric.Song best = null;
-        int bestScore = -1;
-        for (NeteaseLyric.Song s : hits) {
-            if (s == null || s.name == null || s.name.trim().isEmpty()) continue;
-            if (!songMatches(song, s.name)) continue;
-            boolean artOk = artist.isEmpty() || artistMatches(artist, s.artist);
-            if (!artOk) continue;                          // 歌手对不上不采纳
-            int sc = score(song, s.name) + 5;
-            if (sc > bestScore) {
-                bestScore = sc;
-                best = s;
-            }
-        }
-        if (best == null || best.album == null || best.album.trim().isEmpty()) return 0;
-
-        t.album = best.album.trim();
+        t.album = album;
         Db.get(c).setMeta(t.id, t.song, t.artist, t.album);
         android.content.Intent i = new android.content.Intent(ACT_META);
         i.setPackage(c.getPackageName());
         i.putExtra("id", t.id);
         c.sendBroadcast(i);
         return 1;
+    }
+
+    /**
+     * QQ 音乐搜索取专辑。@return 专辑名；null=请求失败；""=没匹配到。
+     */
+    private static String qqAlbum(String song, String artist) {
+        String ns = norm(song);
+        String na = norm(artist);
+        String query = (!artist.isEmpty() && !ns.contains(na)) ? (artist + " " + song) : song;
+        org.json.JSONObject o = qqSearch(query);
+        if (o == null) return null;
+        String hit = pickAlbum(o, song, artist);
+        if (hit == null && !query.equals(song)) {
+            o = qqSearch(song);
+            if (o == null) return null;
+            hit = pickAlbum(o, song, artist);
+        }
+        return hit == null ? "" : hit;
+    }
+
+    /** 从搜索结果里挑专辑：歌名完全一致优先直接采纳，包含匹配取第一个过门控的。 */
+    private static String pickAlbum(org.json.JSONObject o, String song, String artist) {
+        if (o == null) return null;
+        org.json.JSONObject data = o.optJSONObject("data");
+        if (data == null) return null;
+        org.json.JSONObject sj = data.optJSONObject("song");
+        if (sj == null) return null;
+        org.json.JSONArray list = sj.optJSONArray("list");
+        if (list == null) return null;
+        String best = null;
+        for (int i = 0; i < list.length(); i++) {
+            org.json.JSONObject s = list.optJSONObject(i);
+            if (s == null) continue;
+            String name = s.optString("songname");
+            String alb = s.optString("albumname").trim();
+            if (alb.isEmpty()) continue;
+            if (!songMatches(song, name)) continue;
+            StringBuilder sb = new StringBuilder();
+            org.json.JSONArray arts = s.optJSONArray("singer");
+            if (arts != null) {
+                for (int j = 0; j < arts.length(); j++) {
+                    if (j > 0) sb.append("/");
+                    sb.append(arts.optJSONObject(j).optString("name"));
+                }
+            }
+            if (!artist.isEmpty() && !artistMatches(artist, sb.toString())) continue;
+            if (norm(song).equals(norm(name))) return alb;   // 完全一致：直接采纳
+            if (best == null) best = alb;                    // 包含匹配：取第一个
+        }
+        return best;
+    }
+
+    /** QQ 音乐公开搜索接口（无需签名）。失败返回 null。 */
+    private static org.json.JSONObject qqSearch(String query) {
+        try {
+            String url = "https://c.y.qq.com/soso/fcgi-bin/client_search_cp?w="
+                    + java.net.URLEncoder.encode(query, "UTF-8") + "&format=json&n=8";
+            java.util.Map<String, String> h = new java.util.HashMap<String, String>();
+            h.put("Referer", "https://y.qq.com/");
+            com.volcano.bmusic.net.Http.Resp r =
+                    com.volcano.bmusic.net.Http.get(url, h);
+            if (!r.ok() || r.body == null || r.body.trim().isEmpty()) return null;
+            return new org.json.JSONObject(r.body);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /** 歌名一致判定：短名（<3 字）必须完全一致，长名允许包含（如多加「现场版」）。 */

@@ -115,6 +115,7 @@
 | H9 | 桌面小组件点按钮无反应（`Background start not allowed: ... startFg?=false`） | 自主 | v1.0.9 | Android 12+ 从桌面 `PendingIntent.getService` 启动服务被拦截；API 26+ 改用 `PendingIntent.getForegroundService`（服务 onCreate 即 startForeground，满足 5s 要求），API 24/25 仍走 getService |
 | H10 | b23.tv 短链走不进 App（`query-activities` 查不到 BMusic） | 自主 | v1.0.9 | 同一 intent-filter 内多个 `<data>` 是合并求交：`/video/` pathPrefix 约束被应用到 `b23.tv` 上。把 b23.tv / www.b23.tv 拆成独立 intent-filter（无 path 约束）后短链恢复匹配 |
 | H11 | 导入推断的歌名/歌手解析错误（把合集「序号. 歌名 - 歌手」整条颠倒成「歌手=带序号歌名」，且联网校准还会覆盖歌名/歌手导致错配） | 用户 | v1.0.14 | 重写 `MetaResolver.parseLocal`：先 `stripSeq` 剥序号并记 `numbered`，按 UP 主名（`cleanAuthor`）在左/右 + 是否有序号判定「歌名-歌手」左右，`《》`优先，`A _ B` 多歌手统一为 `A / B`；`enrich` 改为**只补专辑**、绝不改歌名/歌手，且须「歌名高度一致 + 歌手对得上」才采纳，否则留空显示 Unknown；`backfill` 升 `meta_backfill_v4`，用标题重推全部存量、再对无专辑曲目节流补专辑（连续 3 次失败即停防限流） |
+| H12 | 专辑校准数据不可信：网易云搜索翻唱太多，专辑字段常是合集名（如「书生尘唱的流行歌」）而非真实专辑 | 用户 | v1.0.15 | 专辑源换成 QQ 音乐公开搜索接口（`c.y.qq.com/soso/fcgi-bin/client_search_cp`，免签名）：返回真实发行专辑（「路」→《丝路》）。门控不变（songMatches + artistMatches）。百科站有 JS 反爬校验（PARIS_CHALLENGE），纯 HTTP 无法访问故不可用；`backfill` 升 v5：清空网易云时代的旧专辑后重新补齐 |
 
 ### I. 桌面小组件（v1.0.9）
 
@@ -175,6 +176,7 @@
 | 44 | 删除全部按钮改为删除所选（灰度/亮起） | v1.0.13 | 头部 `btn_lib_clear` 由「清空曲库」改为 `deleteSelectedTracks`；`updateLibSelCount()` 按 `libSelected` 是否为空 `setEnabled` + `setAlpha(0.35/1.0)`；移除选择栏冗余删除按钮 |
 | 45 | 列表显示「歌手 - 歌名」+ 专辑小字 | v1.0.13 | `Track.listTitle()` = 歌手(空为 Unknown) + " - " + 歌名；`Track.listSub()` = 专辑(空为 Unknown)；`TrackAdapter` 列表行改用这两个方法（曲库/最近/歌单/队列一致） |
 | 46 | 歌名/歌手/专辑解析纠错 | v1.0.14 | `MetaResolver.parseLocal` 重写：剥序号后按「UP 主所在侧 + 是否有序号」判定「歌名 - 歌手」左右（`《》`优先、`_`→` / `）；`enrich` 仅补专辑、不覆盖歌名/歌手；`backfill v4` 用标题重推 99 首存量 |
+| 47 | 专辑数据来源换成 QQ 音乐 | v1.0.15 | `MetaResolver.qqAlbum/qqSearch/pickAlbum`：QQ 音乐公开搜索取真实发行专辑；`backfill v5` 清旧专辑重取；网易云源弃用（翻唱多、专辑常为合集名），百科站 JS 反爬不可抓 |
 
 ---
 
@@ -189,8 +191,9 @@
 - v1.0.12 在 Note8 验证：①批量勾选 2 首→「加入歌单」→选择器含「新建歌单...」→新建「Mix」后提示已加入 2 首、歌单计数刷新；②歌单被播放后列表显示「正在播放」、歌单内当前曲目粉色高亮（`R.id.now` 图标 + 标题变粉）；③返回 B 站直接拉起 B 站 App、定位正确视频且分 P 正确（不再经浏览器）；④删除曲目弹窗含「同时会从曲库删除，本地缓存也一并删除」；⑤导入后曲库按歌手/专辑筛选可用，元信息识别正确（如「A20 LITE 'NEON' / A2O · NEON」）；`MetaResolver` 本地解析 9 例单测通过，联网校准在 429 时安全降级（parseLocal 已足够）；
 - v1.0.13 在 Note8 验证：①勾选模式点「全选」→「已选 249 / 249」全部打勾；再点「反选」→「已选 0 / 249」并保持在勾选模式；②未勾选时头部删除按钮置灰（alpha 0.35）且禁用，勾选后正常亮起；③列表主标题为「歌手 - 歌名」（如「梁静茹 - 从前的爱」），下方小字为专辑（如「燕尾蝶」），未解析到显示 `Unknown`；曲库/最近/歌单/队列共用 TrackAdapter 格式一致；
 - v1.0.14 在 Note8 验证（解析纠错）：存量 99 首经 `backfill v4` 重推后，曲库列表全部为「歌手 - 歌名 / 专辑」正确格式，逐条对照源标题核实——`0051. 不想睡 - 梁静茹`→「梁静茹 - 不想睡」、`0043. PK - 梁静茹 _ 曹格`→「梁静茹 / 曹格 - PK」、`0041. 向左转向右转 - 梁静茹`→「梁静茹 - 向左转向右转」、`0042. 幸福洋果子店 - 梁静茹`→「梁静茹 - 幸福洋果子店」；专辑为真实专辑名（亲亲/燕尾蝶/崇拜/美丽人生/静茹&情歌），证明联网仅补专辑、未覆盖歌名歌手；离线 Python 复刻新旧 `parseLocal` 对 99 条真实标题全量比对通过；
+- v1.0.15 在 Note8 验证（专辑源换 QQ 音乐）：`backfill v5` 跑完后曲库专辑列全部为真实发行专辑——「路/丝路」「给从前的爱/燕尾蝶」「纯真/燕尾蝶」「还是好朋友(古巨基/梁静茹)/我还是你的 情歌王」「完整的我/好吗？－太阳如常升起」「天灯/静茹 & 情歌 别再为他流泪」「她/爱久见人心」「生命中不可承受的轻/崇拜」「三时日光/崇拜」等；对比 v1.0.14 网易云时代的「书生尘唱的流行歌」式合集名已消除；无 crash；
 - 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）。
 
 ---
 
-<p align="center"><sub>BMusic requirements · 更新于 v1.0.14</sub></p>
+<p align="center"><sub>BMusic requirements · 更新于 v1.0.15</sub></p>
