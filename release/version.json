@@ -1,6 +1,7 @@
 {
-  "versionCode": 16,
-  "versionName": "1.0.15",
-  "notes": "1.专辑校准源由网易云换成 QQ 音乐：网易云翻唱太多、专辑常是合集名；QQ 音乐返回真实发行专辑（如「路」→《丝路》）\n2.升级后首次启动自动清空旧专辑并重新联网补齐（backfill v5）\n3.门控不变：歌名一致 + 歌手对得上才采纳，否则显示 Unknown，绝不张冠李戴",
+  "versionCode": 17,
+  "versionName": "1.0.16",
+  "notes": "1.扫码解码器换为 ZXing core 的 QR 子集（Apache 2.0，仅 50 文件）：识别率对齐主流扫码 App，白底/深底、各纠错级、长链接全覆盖\n2.体积仅增 33KB（218→251KB）\n3.已验证：JVM 样张 + Note8 相册识别真码端到端导入成功",
   "url": "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk"
 }
+
