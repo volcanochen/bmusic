@@ -8,6 +8,7 @@ import android.widget.Toast;
 import com.volcano.bmusic.App;
 import com.volcano.bmusic.db.Db;
 import com.volcano.bmusic.model.Track;
+import com.volcano.bmusic.util.MetaResolver;
 
 import org.json.JSONObject;
 
@@ -92,8 +93,11 @@ public final class Importer {
                                     if (seen.contains(t.id)) continue;
                                     seen.add(t.id);
                                     t.added = System.currentTimeMillis();
+                                    // 先本地规则秒出歌名/歌手/专辑，再排队联网校准
+                                    MetaResolver.parseLocal(t);
                                     Db.get(c).upsert(t);
                                     added.add(t);
+                                    MetaResolver.enqueue(c, t);
                                 } catch (Exception e) {
                                     if (fail == null) fail = e.getMessage();
                                 }

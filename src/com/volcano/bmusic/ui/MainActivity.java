@@ -57,6 +57,7 @@ import com.volcano.bmusic.ui.adapter.TrackAdapter;
 import com.volcano.bmusic.util.Cache;
 import com.volcano.bmusic.util.CoverLoader;
 import com.volcano.bmusic.util.Downloader;
+import com.volcano.bmusic.util.MetaResolver;
 import com.volcano.bmusic.util.Notify;
 import com.volcano.bmusic.util.PartAsk;
 import com.volcano.bmusic.util.Receivers;
@@ -88,6 +89,10 @@ public class MainActivity extends Activity {
     private View miniProg;
     private ProgressBar miniLoad;
     private Button btnPlayFilter;
+    private TextView tvFilterChip;
+    /** 曲库筛选：按歌手 / 专辑（null = 不筛）。 */
+    private String filterArtist;
+    private String filterAlbum;
     private ImageView miniArt;
     private TextView miniTitle;
     private TextView miniSub;
@@ -245,6 +250,27 @@ public class MainActivity extends Activity {
         libSelBar = findViewById(R.id.lib_sel_bar);
         tvLibSel = (TextView) findViewById(R.id.tv_lib_sel);
         tvUpdate = (TextView) findViewById(R.id.tv_update);
+        tvFilterChip = (TextView) findViewById(R.id.tv_filter_chip);
+        View btnFilter = findViewById(R.id.btn_filter);
+        if (btnFilter != null) {
+            btnFilter.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    showFilterDialog();
+                }
+            });
+        }
+        if (tvFilterChip != null) {
+            tvFilterChip.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    filterArtist = null;
+                    filterAlbum = null;
+                    updateFilterChip();
+                    reloadTracks();
+                }
+            });
+        }
         if (tvUpdate != null) {
             String v = currentVersionName();
             if (!TextUtils.isEmpty(v)) tvUpdate.setText("当前版本 v" + v);
@@ -646,9 +672,29 @@ public class MainActivity extends Activity {
                     ArrayList<Track> keep = new ArrayList<Track>();
                     for (Track t : all) {
                         String s = (t.title == null ? "" : t.title.toLowerCase())
+                                + " " + (t.song == null ? "" : t.song.toLowerCase())
+                                + " " + (t.artist == null ? "" : t.artist.toLowerCase())
+                                + " " + (t.album == null ? "" : t.album.toLowerCase())
                                 + " " + (t.author == null ? "" : t.author.toLowerCase())
                                 + " " + t.bvid;
                         if (s.contains(f)) keep.add(t);
+                    }
+                    all.clear();
+                    all.addAll(keep);
+                }
+                // 歌手 / 专辑筛选（与搜索叠加）
+                if (filterArtist != null || filterAlbum != null) {
+                    ArrayList<Track> keep = new ArrayList<Track>();
+                    for (Track t : all) {
+                        if (filterArtist != null
+                                && (t.artist == null || !filterArtist.equalsIgnoreCase(t.artist))) {
+                            continue;
+                        }
+                        if (filterAlbum != null
+                                && (t.album == null || !filterAlbum.equalsIgnoreCase(t.album))) {
+                            continue;
+                        }
+                        keep.add(t);
                     }
                     all.clear();
                     all.addAll(keep);
@@ -670,8 +716,122 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void reloadRecent() {
+    // ------------------------------------------------------- 曲库筛选
+
+    /** 第一步：选按歌手还是按专辑；第二步列出可选值。 */
+    private void showFilterDialog() {
+        final boolean active = filterArtist != null || filterAlbum != null;
+        final String[] items = active
+                ? new String[]{"按歌手筛选", "按专辑筛选", "清除筛选"}
+                : new String[]{"按歌手筛选", "按专辑筛选"};
+        new AlertDialog.Builder(this)
+                .setTitle("筛选曲库")
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        if (which == 0) {
+                            pickValue(true);
+                        } else if (which == 1) {
+                            pickValue(false);
+                        } else {
+                            filterArtist = null;
+                            filterAlbum = null;
+                            updateFilterChip();
+                            reloadTracks();
+                        }
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void pickValue(final boolean byArtist) {
         App.postBg(new Runnable() {
+            @Override
+            public void run() {
+                ArrayList<Track> all = Db.get(MainActivity.this).allTracks();
+                final ArrayList<String> vals = new ArrayList<String>();
+                final ArrayList<Integer> cnt = new ArrayList<Integer>();
+                for (Track t : all) {
+                    String v = byArtist ? t.artist : t.album;
+                    if (v == null || v.trim().isEmpty()) continue;
+                    int i = vals.indexOf(v);
+                    if (i < 0) {
+                        vals.add(v);
+                        cnt.add(1);
+                    } else {
+                        cnt.set(i, cnt.get(i) + 1);
+                    }
+                }
+                if (vals.isEmpty()) {
+                    App.runOnUi(new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast.makeText(MainActivity.this,
+                                    "还没有识别到" + (byArtist ? "歌手" : "专辑") + "信息",
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    });
+                    return;
+                }
+                // 曲目多的排前面
+                for (int i = 0; i < vals.size() - 1; i++) {
+                    for (int j = i + 1; j < vals.size(); j++) {
+                        if (cnt.get(j) > cnt.get(i)) {
+                            String tv = vals.get(i);
+                            vals.set(i, vals.get(j));
+                            vals.set(j, tv);
+                            Integer tc = cnt.get(i);
+                            cnt.set(i, cnt.get(j));
+                            cnt.set(j, tc);
+                        }
+                    }
+                }
+                final String[] names = new String[vals.size()];
+                for (int i = 0; i < vals.size(); i++) {
+                    names[i] = vals.get(i) + "（" + cnt.get(i) + " 首）";
+                }
+                App.runOnUi(new Runnable() {
+                    @Override
+                    public void run() {
+                        new AlertDialog.Builder(MainActivity.this)
+                                .setTitle(byArtist ? "选择歌手" : "选择专辑")
+                                .setItems(names, new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface d, int which) {
+                                        if (byArtist) {
+                                            filterArtist = vals.get(which);
+                                            filterAlbum = null;
+                                        } else {
+                                            filterAlbum = vals.get(which);
+                                            filterArtist = null;
+                                        }
+                                        updateFilterChip();
+                                        reloadTracks();
+                                    }
+                                })
+                                .setNegativeButton("取消", null)
+                                .show();
+                    }
+                });
+            }
+        });
+    }
+
+    private void updateFilterChip() {
+        if (tvFilterChip == null) return;
+        String s = null;
+        if (filterArtist != null) s = "歌手：" + filterArtist;
+        else if (filterAlbum != null) s = "专辑：" + filterAlbum;
+        if (s == null) {
+            tvFilterChip.setVisibility(View.GONE);
+        } else {
+            tvFilterChip.setText(s + "  ✕");
+            tvFilterChip.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void reloadRecent() {        App.postBg(new Runnable() {
             @Override
             public void run() {
                 final ArrayList<Track> list = Db.get(MainActivity.this).recent(40);
@@ -691,10 +851,14 @@ public class MainActivity extends Activity {
             @Override
             public void run() {
                 final List<Playlist> list = Db.get(MainActivity.this).playlists();
+                final PlaybackService s = PlaybackService.get();
+                final long curPid = s == null ? -1 : s.queueId();
+                final boolean pl = s != null && s.isPlaying();
                 App.runOnUi(new Runnable() {
                     @Override
                     public void run() {
                         playlistAdapter.setData(list);
+                        playlistAdapter.setPlaying(curPid, pl);
                         emptyPlaylists.setVisibility(list.isEmpty() ? View.VISIBLE : View.GONE);
                     }
                 });
@@ -1428,65 +1592,39 @@ public class MainActivity extends Activity {
         Toast.makeText(this, "已加入队列 " + ids.size() + " 首", Toast.LENGTH_SHORT).show();
     }
 
-    /** 勾选曲目批量加入歌单：先选歌单。 */
+    /** 勾选曲目批量加入歌单：与单曲共用同一套选择器（含「新建歌单」）。 */
     private void addSelectedToPlaylist() {
         if (libSelected.isEmpty()) {
             Toast.makeText(this, "请先勾选曲目", Toast.LENGTH_SHORT).show();
             return;
         }
-        App.postBg(new Runnable() {
-            @Override
-            public void run() {
-                final ArrayList<Object[]> pls = Db.get(MainActivity.this).playlistsFull();
-                App.runOnUi(new Runnable() {
+        final int n = libSelected.size();
+        TrackActions.pickPlaylist(this, "加入歌单（" + n + " 首）",
+                new TrackActions.PickListener() {
                     @Override
-                    public void run() {
-                        if (pls.isEmpty()) {
-                            Toast.makeText(MainActivity.this,
-                                    "还没有歌单，请先在歌单页新建", Toast.LENGTH_LONG).show();
-                            return;
-                        }
-                        final String[] names = new String[pls.size()];
-                        for (int i = 0; i < pls.size(); i++) {
-                            names[i] = (String) pls.get(i)[1];
-                        }
-                        new AlertDialog.Builder(MainActivity.this)
-                                .setTitle("加入歌单（" + libSelected.size() + " 首）")
-                                .setItems(names, new DialogInterface.OnClickListener() {
+                    public void onPick(final long pid, final String pname) {
+                        final ArrayList<String> ids = new ArrayList<String>(libSelected);
+                        App.postBg(new Runnable() {
+                            @Override
+                            public void run() {
+                                for (String tid : ids) {
+                                    Db.get(MainActivity.this).addTo(pid, tid);
+                                }
+                                libSelected.clear();
+                                App.runOnUi(new Runnable() {
                                     @Override
-                                    public void onClick(DialogInterface d, int which) {
-                                        final long pid = (Long) pls.get(which)[0];
-                                        final String pname = names[which];
-                                        final ArrayList<String> ids =
-                                                new ArrayList<String>(libSelected);
-                                        App.postBg(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                for (String tid : ids) {
-                                                    Db.get(MainActivity.this).addTo(pid, tid);
-                                                }
-                                                libSelected.clear();
-                                                App.runOnUi(new Runnable() {
-                                                    @Override
-                                                    public void run() {
-                                                        exitLibSelectMode();
-                                                        reloadPlaylists();
-                                                        Toast.makeText(MainActivity.this,
-                                                                "已加入歌单「" + pname + "」"
-                                                                        + ids.size() + " 首",
-                                                                Toast.LENGTH_LONG).show();
-                                                    }
-                                                });
-                                            }
-                                        });
+                                    public void run() {
+                                        exitLibSelectMode();
+                                        reloadPlaylists();
+                                        Toast.makeText(MainActivity.this,
+                                                "已加入歌单「" + pname + "」" + ids.size() + " 首",
+                                                Toast.LENGTH_LONG).show();
                                     }
-                                })
-                                .setNegativeButton("取消", null)
-                                .show();
+                                });
+                            }
+                        });
                     }
                 });
-            }
-        });
     }
 
     private void confirmClearLibrary() {
@@ -1540,11 +1678,15 @@ public class MainActivity extends Activity {
             if (PlaybackService.ACT_STATE.equals(a)) {
                 miniError = i.getStringExtra("error");
                 refreshMini();
-                if (miniError != null) {
-                    Toast.makeText(MainActivity.this, miniError, Toast.LENGTH_LONG).show();
+                reloadPlaylists();
+                if (miniError != null) {                    Toast.makeText(MainActivity.this, miniError, Toast.LENGTH_LONG).show();
                 }
             } else if (PlaybackService.ACT_PROGRESS.equals(a)) {
                 updateMiniProgress(i.getIntExtra("pos", 0), i.getIntExtra("dur", 0));
+            } else if (MetaResolver.ACT_META.equals(a)) {
+                // 歌手/专辑识别完成：刷新曲库与歌单（列表可能正在显示旧标题）
+                reloadTracks();
+                reloadRecent();
             } else if (Downloader.ACT_DL.equals(a)) {
                 String id = i.getStringExtra(Downloader.EXTRA_ID);
                 int st = i.getIntExtra(Downloader.EXTRA_STATE, 0);
@@ -1575,6 +1717,7 @@ public class MainActivity extends Activity {
         f.addAction(PlaybackService.ACT_PROGRESS);
         f.addAction(Downloader.ACT_DL);
         f.addAction(Importer.ACT_ADDED);
+        f.addAction(MetaResolver.ACT_META);
         f.addAction(CoverLoader.ACT_COVER);
         Receivers.registerLocal(this, receiver, f);
         // 进程冷启动后服务可能不在（迷你条展示的是持久化状态）：唤醒它，
@@ -1583,6 +1726,8 @@ public class MainActivity extends Activity {
                 && App.prefs().getString("last_id", null) != null) {
             PlaybackService.wake(this);
         }
+        // 一次性补齐老曲目的歌手/专辑信息（每个安装只跑一次）
+        MetaResolver.backfill(this);
         refreshMini();
     }
 

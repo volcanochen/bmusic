@@ -164,6 +164,12 @@
 | 34 | 播放队列可删除曲目（删除后同时移出队列） | v1.0.11 | `QueueActivity` 行菜单「删除曲目」传入 after 回调：`Db.deleteTrack` 后 `PlaybackService.removeIds`，服务广播触发列表刷新（此前只删曲库、队列不变，看起来像没反应） |
 | 35 | 曲库多选批量加入播放队列 / 加入歌单 | v1.0.11 | 选择栏加「加入播放队列」「加入歌单」文字按钮（选中才显示）；队列走新增 `A_APPEND_IDS`（批量 append，不打乱当前播放）；歌单 `Db.addTo` 逐条插入 + `reloadPlaylists()` 即时刷新计数 |
 | 36 | 桌面小组件播放钮居中 | v1.0.11 | 根布局 `gravity` 由 `center_vertical` 改 `center`（垂直布局下才带水平居中），FrameLayout 加 `layout_gravity=center_horizontal` |
+| 37 | 批量加入歌单也提供「新建歌单...」 | v1.0.12 | `TrackActions.pickPlaylist` 统一选择器（末项固定「新建歌单...」），单曲 `addToPlaylist` 与批量 `addSelectedToPlaylist` 共用 `PickListener` 回调，行为一致 |
+| 38 | 歌单播放时高亮「正在播放」 | v1.0.12 | `PlaylistActivity.load()` 接 `ACT_STATE` 刷新 + `TrackAdapter.setPlaying(当前id, 是否播放)`；歌单列表 `p.id==playingPid` 显示「正在播放」并粉色高亮 |
+| 39 | 返回 B 站跳过浏览器直达 App | v1.0.12 | `TrackActions.openBili` 先 `setPackage` 指定 B 站包名拉起 App Links，再退 `bilibili://` scheme，最后才退回系统选择器（不再先弹浏览器） |
+| 40 | 返回 B 站分 P 偏移修正 | v1.0.12 | `Bili` 解析 `page` 为 1 起算；`openBili` 用 `?p=page` 原样（去掉误加的 +1），多 P 视频准确定位对应分 P |
+| 41 | 删除曲目提示会同时删曲库/缓存 | v1.0.12 | `TrackActions.confirmDelete` / `QueueActivity` / `PlaylistActivity` 删除前弹「同时会从曲库删除，且本地缓存文件一并删除」 |
+| 42 | 导入时推断歌名/歌手/专辑 | v1.0.12 | `util/MetaResolver`：`parseLocal` 本地规则即时推断 + `enqueue` 单线程联网（网易云）校准；`Db` 增 `song/artist/album/srcTitle` 列；曲库可按歌手/专辑筛选、搜索与歌词用规范名 |
 
 ---
 
@@ -175,8 +181,9 @@
 - v1.0.9 其余各项 Note8 验证：相册识别二维码→导入成功（BV1xx411c7mD）、多选勾选（已选 1/3）→删除→曲目移除（3→2首）、清空确认框、扫码页+相机权限+实时预览、检查更新显示「已是最新 v1.0.9」（真机拉取线上 version.json）；
 - v1.0.10 在 Note8 验证：关网后播放逐首跳过并提示、整列表无缓存试完一轮停止（toast「整个列表都没有缓存，已停止播放」）；扫码预览正立不变形、相册识别回归通过；设置页无介绍文字、关于页正常（v1.0.10）；备份导出 Download/bmusic_backup_*.json 成功、删除曲目后恢复合并导入成功（2→3 首）；打开缓存文件夹弹路径兜底；小组件显示小圆钮+两行完整文字；
 - v1.0.11 在 Note8 验证：曲库多选 2 首→「加入播放队列」→播放页队列 1→3 首；队列页行菜单「删除曲目」→队列 3→2 首且曲库同步 2 首；多选 2 首→「加入歌单」→toast 已加入 2 首、歌单计数即时刷新为 2（重启前也一致，说明数据与 UI 同步）；小组件播放钮水平垂直居中；
+- v1.0.12 在 Note8 验证：①批量勾选 2 首→「加入歌单」→选择器含「新建歌单...」→新建「Mix」后提示已加入 2 首、歌单计数刷新；②歌单被播放后列表显示「正在播放」、歌单内当前曲目粉色高亮（`R.id.now` 图标 + 标题变粉）；③返回 B 站直接拉起 B 站 App、定位正确视频且分 P 正确（不再经浏览器）；④删除曲目弹窗含「同时会从曲库删除，本地缓存也一并删除」；⑤导入后曲库按歌手/专辑筛选可用，元信息识别正确（如「A20 LITE 'NEON' / A2O · NEON」）；`MetaResolver` 本地解析 9 例单测通过，联网校准在 429 时安全降级（parseLocal 已足够）；
 - 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）。
 
 ---
 
-<p align="center"><sub>BMusic requirements · 更新于 v1.0.11</sub></p>
+<p align="center"><sub>BMusic requirements · 更新于 v1.0.12</sub></p>

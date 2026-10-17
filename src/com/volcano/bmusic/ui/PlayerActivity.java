@@ -723,6 +723,13 @@ public class PlayerActivity extends Activity {
     /** "artist + song name" with part numbers / ids stripped — used to pre-fill. */
     private static String suggestQuery(Track t) {
         if (t == null) return "";
+        // 已经识别出歌手/歌名时直接用，比从标题里猜准得多
+        String artist = t.artist == null ? "" : t.artist.trim();
+        String song = t.song == null ? "" : t.song.trim();
+        if (!song.isEmpty()) {
+            if (artist.isEmpty() || song.toLowerCase().contains(artist.toLowerCase())) return song;
+            return artist + " " + song;
+        }
         String q = NeteaseLyric.suggestQuery(t.title, t.author);
         if (q.isEmpty()) q = t.title == null ? "" : t.title;
         return q;

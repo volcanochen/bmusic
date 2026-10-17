@@ -66,4 +66,5 @@
     <string name="lib_queue_sel">加入播放队列</string>
     <string name="lib_pl_sel">加入歌单</string>
     <string name="menu_pick_image">从相册识别</string>
+    <string name="filter_by_artist_album">按歌手或专辑筛选</string>
 </resources>

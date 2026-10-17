@@ -2,9 +2,11 @@ package com.volcano.bmusic.ui;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
@@ -18,6 +20,8 @@ import com.volcano.bmusic.db.Db;
 import com.volcano.bmusic.model.Track;
 import com.volcano.bmusic.player.PlaybackService;
 import com.volcano.bmusic.ui.adapter.TrackAdapter;
+import com.volcano.bmusic.util.Downloader;
+import com.volcano.bmusic.util.Receivers;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -122,11 +126,11 @@ public class PlaylistActivity extends Activity {
                         break;
                     case 7:
                         TrackActions.confirmDelete(PlaylistActivity.this, track, new Runnable() {
-                            @Override
-                            public void run() {
-                                load();
-                            }
-                        });
+                                    @Override
+                                    public void run() {
+                                        load();
+                                    }
+                                }, "同时会从所有歌单中移出，并删除本地缓存文件");
                         break;
                 }
             }
@@ -173,6 +177,46 @@ public class PlaylistActivity extends Activity {
                 });
             }
         });
+    }
+
+    /** 跟着播放状态刷新高亮（当前曲目变化时更新「正在播放」标记）。 */
+    private final BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context c, Intent i) {
+            String a = i.getAction();
+            if (PlaybackService.ACT_STATE.equals(a)) {
+                load();
+            } else if (Downloader.ACT_DL.equals(a)) {
+                String id = i.getStringExtra(Downloader.EXTRA_ID);
+                int st = i.getIntExtra(Downloader.EXTRA_STATE, 0);
+                if (st == 0) {
+                    adapter.setProgress(id, i.getIntExtra(Downloader.EXTRA_PROGRESS, 0));
+                } else {
+                    adapter.setProgress(id, null);
+                    load();
+                }
+            }
+        }
+    };
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        IntentFilter f = new IntentFilter();
+        f.addAction(PlaybackService.ACT_STATE);
+        f.addAction(Downloader.ACT_DL);
+        Receivers.registerLocal(this, receiver, f);
+        if (PlaybackService.get() == null) PlaybackService.wake(this);
+        load();
+    }
+
+    @Override
+    protected void onStop() {
+        try {
+            unregisterReceiver(receiver);
+        } catch (Exception ignored) {
+        }
+        super.onStop();
     }
 
     @Override

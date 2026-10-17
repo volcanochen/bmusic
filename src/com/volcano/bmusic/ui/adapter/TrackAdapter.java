@@ -118,10 +118,10 @@ public class TrackAdapter extends BaseAdapter {
             h = (Holder) v.getTag();
         }
         final Track t = data.get(position);
-        h.title.setText(t.title == null ? t.bvid : t.title);
+        h.title.setText(t.displayTitle());
         String suffix = "";
         if (t.plays > 0) suffix = "  ·  播过" + t.plays + "次";
-        h.sub.setText((t.author == null ? "" : t.author) + suffix);
+        h.sub.setText(t.subTitle() + suffix);
         h.dur.setText(t.duration > 0 ? Track.fmt(t.duration) : "--:--");
         Integer pct = progress.get(t.id);
         if (pct != null) {

@@ -13,6 +13,17 @@ public class Track implements Serializable {
     public int page;
     public String title;
     public String author;
+    /**
+     * 视频原始标题（多 P 时 {@link #title} 只是分 P 名，这里保留合集标题，
+     * 歌手/专辑推断要用）。
+     */
+    public String srcTitle;
+    /** 推断出的歌名（去掉 UP 主前缀、MV/官方等噪声），空则退回 title。 */
+    public String song;
+    /** 推断出的歌手。 */
+    public String artist;
+    /** 推断出的专辑。 */
+    public String album;
     public String cover;
     /** ms */
     public long duration;
@@ -41,13 +52,33 @@ public class Track implements Serializable {
     }
 
     public String playTitle() {
+        return displayTitle();
+    }
+
+    /** 展示用歌名：优先用识别出的歌名，否则用原标题。 */
+    public String displayTitle() {
+        if (song != null && !song.isEmpty()) return song;
         if (title != null && !title.isEmpty()) return title;
         return bvid;
     }
 
-    /** Display name: uses part title when multi-part. */
+    /** 展示用副标题：歌手 · 专辑（能识别到哪个用哪个），都没有则用 UP 主。 */
     public String subTitle() {
-        return author == null || author.isEmpty() ? "" : author;
+        StringBuilder sb = new StringBuilder();
+        if (artist != null && !artist.isEmpty()) sb.append(artist);
+        if (album != null && !album.isEmpty()) {
+            if (sb.length() > 0) sb.append(" · ");
+            sb.append(album);
+        }
+        if (sb.length() == 0) {
+            return author == null ? "" : author;
+        }
+        return sb.toString();
+    }
+
+    /** 是否已经推断过歌手/歌名。 */
+    public boolean hasMeta() {
+        return (artist != null && !artist.isEmpty()) || (song != null && !song.isEmpty());
     }
 
     /** true when a readable local cache file exists */

@@ -17,9 +17,19 @@ public class PlaylistAdapter extends BaseAdapter {
 
     private final Context ctx;
     private final List<Playlist> data = new ArrayList<Playlist>();
+    /** Id of the playlist the current queue came from; -1 = none. */
+    private long playingPid = -1;
+    private boolean playing;
 
     public PlaylistAdapter(Context c) {
         ctx = c;
+    }
+
+    /** Mark which playlist is currently being played (pass -1 to clear). */
+    public void setPlaying(long pid, boolean isPlaying) {
+        playingPid = pid;
+        playing = isPlaying;
+        notifyDataSetChanged();
     }
 
     public void setData(List<Playlist> list) {
@@ -57,9 +67,12 @@ public class PlaylistAdapter extends BaseAdapter {
             h = (Holder) v.getTag();
         }
         Playlist p = data.get(position);
+        boolean isCur = p.id == playingPid;
         h.name.setText(p.name);
         h.count.setText(p.count + " 首");
-        h.extra.setText("");
+        h.extra.setText(isCur ? (playing ? "正在播放" : "已暂停") : "");
+        h.name.setTextColor(ctx.getResources().getColor(isCur ? R.color.pink : R.color.text));
+        h.extra.setTextColor(ctx.getResources().getColor(R.color.pink));
         return v;
     }
 

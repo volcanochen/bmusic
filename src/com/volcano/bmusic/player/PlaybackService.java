@@ -369,6 +369,16 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         }
     }
 
+    /** Id of the playlist the current queue came from (-1 for "all tracks"). */
+    public long queueId() {
+        return queuePid;
+    }
+
+    /** Ids of the tracks currently in the queue, in play order. */
+    public ArrayList<String> queueTrackIds() {
+        return queueIds;
+    }
+
     private void saveQueue() {
         App.prefs().edit()
                 .putLong("queue_pid", queuePid)

@@ -154,7 +154,7 @@
                 android:drawableLeft="@drawable/ic_search"
                 android:drawablePadding="8dp"
                 android:drawableTint="@color/text_dim"
-                android:hint="搜索标题或UP主"
+                android:hint="搜索歌名/歌手/专辑/UP主"
                 android:imeOptions="actionSearch"
                 android:inputType="text"
                 android:paddingLeft="12dp"
@@ -163,6 +163,16 @@
                 android:textColor="@color/text"
                 android:textColorHint="@color/text_dim"
                 android:textSize="13sp" />
+
+                <ImageButton
+                    android:id="@+id/btn_filter"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginLeft="6dp"
+                    android:background="@null"
+                    android:contentDescription="@string/filter_by_artist_album"
+                    android:src="@drawable/ic_filter"
+                    android:tint="@color/text_dim" />
 
                 <Button
                     android:id="@+id/btn_play_filter"
@@ -181,6 +191,21 @@
                     android:textColor="@color/text"
                     android:textSize="12sp" />
             </LinearLayout>
+
+            <!-- 当前筛选条件（歌手/专辑），点击清除 -->
+            <TextView
+                android:id="@+id/tv_filter_chip"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:layout_marginBottom="4dp"
+                android:layout_marginLeft="16dp"
+                android:background="@drawable/circle_dark"
+                android:gravity="center"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:textColor="@color/pink"
+                android:textSize="11sp"
+                android:visibility="gone" />
 
             <FrameLayout
                 android:layout_width="match_parent"

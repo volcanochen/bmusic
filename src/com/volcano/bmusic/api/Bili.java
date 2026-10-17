@@ -434,6 +434,7 @@ public final class Bili {
         t.id = bvid + "_p" + want;
         t.title = (pages != null && pages.length() > 1 && part != null && part.length() > 0)
                 ? part : title;
+        t.srcTitle = title;
         t.author = ownerName;
         t.cover = normalizePic(pic);
         t.duration = durSec * 1000L;

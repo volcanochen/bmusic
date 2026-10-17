@@ -272,6 +272,15 @@ public final class NeteaseLyric {
         return singer + " " + song;
     }
 
+    /** Synchronous search for callers that already run on a worker thread. */
+    public static List<Song> searchNow(String query) {
+        try {
+            return searchList(query);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private static List<Song> searchList(String query) throws Exception {
         String url = "https://music.163.com/api/cloudsearch/pc?type=1&s="
                 + URLEncoder.encode(query, "UTF-8") + "&limit=10&offset=0";
@@ -288,7 +297,9 @@ public final class NeteaseLyric {
             Song song = new Song();
             song.id = s.optString("id");
             song.name = s.optString("name");
+            // 新旧字段名都见过：artists/album 与 ar/al
             JSONArray arts = s.optJSONArray("artists");
+            if (arts == null) arts = s.optJSONArray("ar");
             StringBuilder ab = new StringBuilder();
             if (arts != null) {
                 for (int j = 0; j < arts.length(); j++) {
@@ -298,6 +309,7 @@ public final class NeteaseLyric {
             }
             song.artist = ab.toString();
             JSONObject al = s.optJSONObject("album");
+            if (al == null) al = s.optJSONObject("al");
             song.album = al != null ? al.optString("name") : "";
             songs.add(song);
         }

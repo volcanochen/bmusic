@@ -15,7 +15,7 @@ import java.util.List;
 public class Db extends SQLiteOpenHelper {
 
     private static final String NAME = "bmusic.db";
-    private static final int VER = 1;
+    private static final int VER = 2;
     private static Db sInst;
 
     public static synchronized Db get(Context c) {
@@ -34,7 +34,8 @@ public class Db extends SQLiteOpenHelper {
                 + "bvid TEXT, cid INTEGER, page INTEGER,"
                 + "title TEXT, author TEXT, cover TEXT, duration INTEGER,"
                 + "added INTEGER, last_played INTEGER, plays INTEGER,"
-                + "cached INTEGER DEFAULT 0, path TEXT, fav INTEGER DEFAULT 0)");
+                + "cached INTEGER DEFAULT 0, path TEXT, fav INTEGER DEFAULT 0,"
+                + "src_title TEXT, song TEXT, artist TEXT, album TEXT)");
         d.execSQL("CREATE TABLE IF NOT EXISTS playlists("
                 + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 + "name TEXT, created INTEGER, kind INTEGER DEFAULT 0)");
@@ -51,11 +52,21 @@ public class Db extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase d, int oldV, int newV) {
-        d.execSQL("DROP TABLE IF EXISTS tracks");
-        d.execSQL("DROP TABLE IF EXISTS playlists");
-        d.execSQL("DROP TABLE IF EXISTS pl_tracks");
-        d.execSQL("DROP TABLE IF EXISTS history");
-        onCreate(d);
+        // v2: 歌名/歌手/专辑识别 —— 只加列，不重建表，老用户的曲库/歌单原样保留
+        if (oldV < 2) {
+            addColumn(d, "src_title", "TEXT");
+            addColumn(d, "song", "TEXT");
+            addColumn(d, "artist", "TEXT");
+            addColumn(d, "album", "TEXT");
+        }
+    }
+
+    private static void addColumn(SQLiteDatabase d, String name, String type) {
+        try {
+            d.execSQL("ALTER TABLE tracks ADD COLUMN " + name + " " + type);
+        } catch (Exception ignored) {
+            // column already exists
+        }
     }
 
     // ------------------------------------------------------------- tracks
@@ -76,11 +87,21 @@ public class Db extends SQLiteOpenHelper {
         t.cached = c.getInt(c.getColumnIndex("cached")) == 1;
         t.path = c.getString(c.getColumnIndex("path"));
         t.fav = c.getInt(c.getColumnIndex("fav")) == 1;
+        t.srcTitle = optString(c, "src_title");
+        t.song = optString(c, "song");
+        t.artist = optString(c, "artist");
+        t.album = optString(c, "album");
         return t;
     }
 
+    private static String optString(Cursor c, String col) {
+        int i = c.getColumnIndex(col);
+        return i < 0 ? null : c.getString(i);
+    }
+
     private static final String TRACK_COLS =
-            "id,bvid,cid,page,title,author,cover,duration,added,last_played,plays,cached,path,fav";
+            "id,bvid,cid,page,title,author,cover,duration,added,last_played,plays,cached,path,fav,"
+                    + "src_title,song,artist,album";
 
     public synchronized Track get(String id) {
         SQLiteDatabase d = getReadableDatabase();
@@ -142,7 +163,21 @@ public class Db extends SQLiteOpenHelper {
         cv.put("cached", t.cached ? 1 : 0);
         cv.put("path", t.path);
         cv.put("fav", t.fav ? 1 : 0);
+        cv.put("src_title", t.srcTitle);
+        cv.put("song", t.song);
+        cv.put("artist", t.artist);
+        cv.put("album", t.album);
         d.insertWithOnConflict("tracks", null, cv, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    /** 只更新识别出来的元信息（歌手/歌名/专辑），不碰播放统计与缓存字段。 */
+    public synchronized void setMeta(String id, String song, String artist, String album) {
+        SQLiteDatabase d = getWritableDatabase();
+        ContentValues cv = new ContentValues();
+        cv.put("song", song);
+        cv.put("artist", artist);
+        cv.put("album", album);
+        d.update("tracks", cv, "id=?", new String[]{id});
     }
 
     public synchronized void setCache(String id, boolean cached, String path) {
