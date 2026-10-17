@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2x2 桌面小组件：root 区域进播放页，中间大圆钮切播放/暂停 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg">
+
+    <ImageView
+        android:id="@+id/widget_toggle"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:layout_gravity="center"
+        android:background="@drawable/widget_btn"
+        android:scaleType="fitCenter"
+        android:padding="26dp"
+        android:src="@drawable/ic_play"
+        android:contentDescription="@string/widget_play_pause" />
+</FrameLayout>

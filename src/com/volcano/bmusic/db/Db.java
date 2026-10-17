@@ -196,6 +196,14 @@ public class Db extends SQLiteOpenHelper {
         d.delete("history", "tid=?", new String[]{id});
     }
 
+    /** Remove every track from the library (keeps playlist rows but empties them). */
+    public synchronized void clearTracks() {
+        SQLiteDatabase d = getWritableDatabase();
+        d.delete("tracks", null, null);
+        d.delete("pl_tracks", null, null);
+        d.delete("history", null, null);
+    }
+
     // ---------------------------------------------------------- playlists
 
     public synchronized List<Playlist> playlists() {

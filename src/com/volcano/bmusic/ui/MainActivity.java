@@ -13,6 +13,8 @@ import android.content.res.Configuration;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.BroadcastReceiver;
+import android.content.pm.PackageManager;
+import android.content.ActivityNotFoundException;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -59,6 +61,11 @@ import com.volcano.bmusic.util.Notify;
 import com.volcano.bmusic.util.PartAsk;
 import com.volcano.bmusic.util.Receivers;
 import com.volcano.bmusic.util.Win;
+import com.volcano.bmusic.net.Http;
+import com.volcano.bmusic.ui.UpdateActivity;
+import com.volcano.bmusic.util.ApkUpdater;
+
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -102,6 +109,17 @@ public class MainActivity extends Activity {
     private int page = 0;
     private String filter = "";
     private final Handler handler = new Handler();
+
+    // 曲库多选
+    private java.util.HashSet<String> libSelected = new java.util.HashSet<String>();
+    private boolean libSelectMode = false;
+    private View btnLibSelect;
+    private View btnLibClear;
+    private View btnLibDelSel;
+    private View btnLibCancel;
+    private View libSelBar;
+    private TextView tvLibSel;
+    private TextView tvUpdate;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -216,6 +234,17 @@ public class MainActivity extends Activity {
         miniTitle = (TextView) findViewById(R.id.mini_title);
         miniSub = (TextView) findViewById(R.id.mini_sub);
         miniPlay = (ImageButton) findViewById(R.id.mini_play);
+        btnLibSelect = findViewById(R.id.btn_lib_select);
+        btnLibClear = findViewById(R.id.btn_lib_clear);
+        btnLibDelSel = findViewById(R.id.btn_lib_del_sel);
+        btnLibCancel = findViewById(R.id.btn_lib_cancel_sel);
+        libSelBar = findViewById(R.id.lib_sel_bar);
+        tvLibSel = (TextView) findViewById(R.id.tv_lib_sel);
+        tvUpdate = (TextView) findViewById(R.id.tv_update);
+        if (tvUpdate != null) {
+            String v = currentVersionName();
+            if (!TextUtils.isEmpty(v)) tvUpdate.setText("当前版本 v" + v);
+        }
     }
 
     private void initTabs() {
@@ -264,6 +293,11 @@ public class MainActivity extends Activity {
         trackAdapter = new TrackAdapter(this, new TrackAdapter.Listener() {
             @Override
             public void onPlay(List<Track> list, int pos) {
+                if (libSelectMode) {
+                    trackAdapter.toggleSelected(list.get(pos).id);
+                    updateLibSelCount();
+                    return;
+                }
                 PlaybackService.append(MainActivity.this, list.get(pos).id);
                 Toast.makeText(MainActivity.this, "已加入队列", Toast.LENGTH_SHORT).show();
             }
@@ -359,9 +393,42 @@ public class MainActivity extends Activity {
         findViewById(R.id.btn_add).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                showAddDialog();
+                showAddSourceDialog();
             }
         });
+        // 曲库：多选 / 批量删除 / 清空
+        if (btnLibSelect != null) {
+            btnLibSelect.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    toggleLibSelectMode();
+                }
+            });
+        }
+        if (btnLibCancel != null) {
+            btnLibCancel.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    exitLibSelectMode();
+                }
+            });
+        }
+        if (btnLibDelSel != null) {
+            btnLibDelSel.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    deleteSelectedTracks();
+                }
+            });
+        }
+        if (btnLibClear != null) {
+            btnLibClear.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    confirmClearLibrary();
+                }
+            });
+        }
         if (btnPlayFilter != null) {
             btnPlayFilter.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -387,7 +454,7 @@ public class MainActivity extends Activity {
             btnUpdate.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    startAppUpdate();
+                    checkUpdate();
                 }
             });
         }
@@ -976,72 +1043,246 @@ public class MainActivity extends Activity {
 
     // ---------------------------------------------------------- app update
 
-    /** GitHub 直链（始终最新版），见 release/README.md。 */
-    private static final String UPDATE_URL =
+    private static final String UPDATE_INFO_URL =
+            "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/version.json";
+    private static final String UPDATE_APK_URL =
             "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk";
 
-    private long updateDlId = -1;
-
-    /** 用系统 DownloadManager 下载最新 APK，完成后拉起安装器。 */
-    private void startAppUpdate() {
+    private String currentVersionName() {
         try {
-            DownloadManager.Request req = new DownloadManager.Request(Uri.parse(UPDATE_URL));
-            req.setTitle("BMusic 更新");
-            req.setDescription("正在下载最新版本…");
-            req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            req.setMimeType("application/vnd.android.package-archive");
-            DownloadManager dm = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
-            updateDlId = dm.enqueue(req);
-            Toast.makeText(this, "开始下载最新版本，完成后点击通知安装", Toast.LENGTH_SHORT).show();
-            pollUpdate();
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception e) {
-            Toast.makeText(this, "下载失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+            return "";
         }
     }
 
-    private void pollUpdate() {
-        handler.postDelayed(new Runnable() {
+    private int currentVersionCode() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    /** 检查更新：拉 release/version.json 比对版本号，有新版打开介绍页。 */
+    private void checkUpdate() {
+        Toast.makeText(this, "正在检查更新…", Toast.LENGTH_SHORT).show();
+        final int curCode = currentVersionCode();
+        App.postNet(new Runnable() {
             @Override
             public void run() {
-                if (updateDlId == -1 || isFinishing()) return;
-                DownloadManager dm =
-                        (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
-                Cursor c = dm.query(new DownloadManager.Query().setFilterById(updateDlId));
-                boolean done = false;
-                if (c != null && c.moveToFirst()) {
-                    int st = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
-                    if (st == DownloadManager.STATUS_SUCCESSFUL) {
-                        done = true;
-                        Uri uri = dm.getUriForDownloadedFile(updateDlId);
-                        updateDlId = -1;
-                        installApk(uri);
-                    } else if (st == DownloadManager.STATUS_FAILED) {
-                        done = true;
-                        updateDlId = -1;
-                        Toast.makeText(MainActivity.this,
-                                "下载失败，请检查网络后重试", Toast.LENGTH_LONG).show();
-                    }
+                String body = null, err = null;
+                try {
+                    Http.Resp r = Http.get(UPDATE_INFO_URL, null);
+                    if (r.ok()) body = r.body;
+                    else err = "HTTP " + r.code;
+                } catch (Exception e) {
+                    err = e.getMessage();
                 }
-                if (c != null) c.close();
-                if (!done && !isFinishing()) pollUpdate();
+                final String fBody = body, fErr = err;
+                App.runOnUi(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (fBody == null) {
+                            Toast.makeText(MainActivity.this,
+                                    "检查更新失败：" + fErr, Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        try {
+                            JSONObject o = new JSONObject(fBody);
+                            int newCode = o.optInt("versionCode", 0);
+                            String newName = o.optString("versionName", "");
+                            String notes = o.optString("notes", "");
+                            String url = o.optString("url", UPDATE_APK_URL);
+                            if (newCode > curCode) {
+                                Intent i = new Intent(MainActivity.this, UpdateActivity.class);
+                                i.putExtra(UpdateActivity.EXTRA_CUR, currentVersionName());
+                                i.putExtra(UpdateActivity.EXTRA_NEW, newName);
+                                i.putExtra(UpdateActivity.EXTRA_NOTES, notes);
+                                i.putExtra(UpdateActivity.EXTRA_URL, url);
+                                startActivity(i);
+                            } else {
+                                Toast.makeText(MainActivity.this,
+                                        "已是最新版本 v" + currentVersionName(),
+                                        Toast.LENGTH_LONG).show();
+                                if (tvUpdate != null) {
+                                    tvUpdate.setText("已是最新 v" + currentVersionName());
+                                }
+                            }
+                        } catch (Exception e) {
+                            Toast.makeText(MainActivity.this,
+                                    "解析更新信息失败", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
             }
-        }, 1500);
+        });
     }
 
-    private void installApk(Uri uri) {
-        if (uri == null) {
-            Toast.makeText(this, "下载文件不可用", Toast.LENGTH_LONG).show();
+    // -------------------------------------------------------- scan / import
+
+    private static final int REQ_SCAN = 9001;
+    private static final int REQ_IMG = 9002;
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != RESULT_OK || data == null) return;
+        String text = data.getStringExtra(ScanActivity.EXTRA_TEXT);
+        if (TextUtils.isEmpty(text) && requestCode == REQ_IMG) {
+            Uri uri = data.getData();
+            if (uri != null) {
+                Toast.makeText(this, "识别中…", Toast.LENGTH_SHORT).show();
+                text = ScanActivity.decodeImageUri(this, uri);
+            }
+        }
+        if (TextUtils.isEmpty(text)) {
+            if (requestCode == REQ_SCAN || requestCode == REQ_IMG) {
+                Toast.makeText(this, R.string.scan_no_qr, Toast.LENGTH_LONG).show();
+            }
             return;
         }
-        Intent i = new Intent(Intent.ACTION_VIEW);
-        i.setDataAndType(uri, "application/vnd.android.package-archive");
-        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        try {
-            startActivity(i);
-        } catch (Exception e) {
-            Toast.makeText(this,
-                    "请在系统设置里允许 BMusic「安装未知应用」后重试", Toast.LENGTH_LONG).show();
+        doImport(text);
+    }
+
+    /** 「+」来源菜单：粘贴链接 / 扫码 / 相册识别 / 手动输入。 */
+    private void showAddSourceDialog() {
+        final String[] items = {
+                getString(R.string.menu_paste),
+                getString(R.string.menu_scan),
+                getString(R.string.menu_pick_image),
+                getString(R.string.menu_manual)
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.add_title)
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        if (which == 0) {
+                            String clip = clipboardText();
+                            if (TextUtils.isEmpty(clip)) {
+                                Toast.makeText(MainActivity.this,
+                                        "剪贴板是空的，请先在B站分享时「复制链接」",
+                                        Toast.LENGTH_LONG).show();
+                                return;
+                            }
+                            doImport(clip);
+                        } else if (which == 1) {
+                            startActivityForResult(new Intent(MainActivity.this,
+                                    ScanActivity.class), REQ_SCAN);
+                        } else if (which == 2) {
+                            Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                            i.setType("image/*");
+                            i.addCategory(Intent.CATEGORY_OPENABLE);
+                            try {
+                                startActivityForResult(
+                                        Intent.createChooser(i, "选择二维码图片"), REQ_IMG);
+                            } catch (ActivityNotFoundException e) {
+                                Toast.makeText(MainActivity.this,
+                                        "没有可用的图片选择器", Toast.LENGTH_SHORT).show();
+                            }
+                        } else {
+                            showAddDialog();
+                        }
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    // ----------------------------------------------------- library multi-op
+
+    private void updateLibSelCount() {
+        if (tvLibSel == null || trackAdapter == null) return;
+        tvLibSel.setText(getString(R.string.lib_selected,
+                libSelected.size(), trackAdapter.getCount()));
+        boolean has = !libSelected.isEmpty();
+        if (btnLibDelSel != null) {
+            btnLibDelSel.setVisibility(has ? View.VISIBLE : View.GONE);
         }
+        if (btnLibCancel != null) {
+            btnLibCancel.setVisibility(has ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private void toggleLibSelectMode() {
+        libSelectMode = !libSelectMode;
+        if (libSelectMode) libSelected.clear();
+        trackAdapter.setSelectable(libSelectMode ? libSelected : null);
+        libSelBar.setVisibility(libSelectMode ? View.VISIBLE : View.GONE);
+        updateLibSelCount();
+    }
+
+    private void exitLibSelectMode() {
+        if (!libSelectMode) return;
+        libSelectMode = false;
+        libSelected.clear();
+        trackAdapter.setSelectable(null);
+        libSelBar.setVisibility(View.GONE);
+    }
+
+    private void deleteSelectedTracks() {
+        if (libSelected.isEmpty()) {
+            Toast.makeText(this, "请先勾选要删除的曲目", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final ArrayList<String> ids = new ArrayList<String>(libSelected);
+        new AlertDialog.Builder(this)
+                .setTitle("删除所选")
+                .setMessage("删除勾选的 " + ids.size() + " 首曲目？")
+                .setPositiveButton("删除", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        App.postBg(new Runnable() {
+                            @Override
+                            public void run() {
+                                for (String id : ids) Db.get(MainActivity.this).deleteTrack(id);
+                                libSelected.clear();
+                                PlaybackService.removeIds(MainActivity.this, ids);
+                                App.runOnUi(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        updateLibSelCount();
+                                        reloadAll();
+                                        Toast.makeText(MainActivity.this,
+                                                "已删除", Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+                            }
+                        });
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void confirmClearLibrary() {
+        new AlertDialog.Builder(this)
+                .setTitle("清空曲库")
+                .setMessage("将删除全部曲目，歌单内容和最近播放也会一并清空。确定？")
+                .setPositiveButton("清空", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        App.postBg(new Runnable() {
+                            @Override
+                            public void run() {
+                                Db.get(MainActivity.this).clearTracks();
+                                PlaybackService.clearQueue(MainActivity.this);
+                                App.runOnUi(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        exitLibSelectMode();
+                                        reloadAll();
+                                        Toast.makeText(MainActivity.this,
+                                                "曲库已清空", Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+                            }
+                        });
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     private void playFrom(List<Track> list, int pos, long pid) {

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.volcano.bmusic"
-    android:versionCode="9"
-    android:versionName="1.0.8">
+    android:versionCode="10"
+    android:versionName="1.0.9">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.READ_CLIPBOARD" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:name=".App"
@@ -35,13 +36,24 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <intent-filter>
+            <intent-filter
+                android:label="打开 BMusic 播放"
+                android:icon="@drawable/ic_badge_play">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="www.bilibili.com" android:pathPrefix="/video/" />
                 <data android:scheme="http" android:host="www.bilibili.com" android:pathPrefix="/video/" />
                 <data android:scheme="https" android:host="m.bilibili.com" android:pathPrefix="/video/" />
+            </intent-filter>
+            <!-- b23.tv 短链无 /video/ 前缀，必须单独成 filter（同一 filter 内
+                 多个 data 是合并求交，pathPrefix 会误伤 b23.tv） -->
+            <intent-filter
+                android:label="打开 BMusic 播放"
+                android:icon="@drawable/ic_badge_play">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="b23.tv" />
                 <data android:scheme="http" android:host="b23.tv" />
                 <data android:scheme="https" android:host="www.b23.tv" />
@@ -77,25 +89,49 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden|fontScale|uiMode" />
 
         <activity
+            android:name=".ui.UpdateActivity"
+            android:exported="false"
+            android:resizeableActivity="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden|fontScale|uiMode"
+            android:theme="@style/AppTheme" />
+
+        <activity
+            android:name=".ui.ScanActivity"
+            android:exported="false"
+            android:resizeableActivity="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden|fontScale|uiMode" />
+
+        <activity
             android:name=".ui.ShareActivity"
             android:exported="true"
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
             android:noHistory="true"
             android:theme="@style/Theme.Transparent">
-            <intent-filter>
+            <intent-filter
+                android:label="添加到 BMusic 曲库"
+                android:icon="@drawable/ic_badge_add">
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
-            <intent-filter>
+            <intent-filter
+                android:label="添加到 BMusic 曲库"
+                android:icon="@drawable/ic_badge_add">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="www.bilibili.com" android:pathPrefix="/video/" />
+                <data android:scheme="https" android:host="m.bilibili.com" android:pathPrefix="/video/" />
+            </intent-filter>
+            <intent-filter
+                android:label="添加到 BMusic 曲库"
+                android:icon="@drawable/ic_badge_add">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="b23.tv" />
                 <data android:scheme="http" android:host="b23.tv" />
-                <data android:scheme="https" android:host="www.bilibili.com" android:pathPrefix="/video/" />
-                <data android:scheme="https" android:host="m.bilibili.com" android:pathPrefix="/video/" />
             </intent-filter>
         </activity>
 
@@ -110,6 +146,19 @@
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".ui.WidgetProvider"
+            android:exported="false"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.volcano.bmusic.STATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_play_info" />
         </receiver>
     </application>
 

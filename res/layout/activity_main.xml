@@ -33,6 +33,24 @@
                     android:text="@string/tab_tracks" />
 
                 <ImageButton
+                    android:id="@+id/btn_lib_select"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/circle_dark"
+                    android:contentDescription="@string/lib_select"
+                    android:src="@drawable/ic_check"
+                    android:tint="@color/text" />
+
+                <ImageButton
+                    android:id="@+id/btn_lib_clear"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/circle_dark"
+                    android:contentDescription="@string/lib_clear"
+                    android:src="@drawable/ic_delete"
+                    android:tint="@color/text" />
+
+                <ImageButton
                     android:id="@+id/btn_add"
                     android:layout_width="44dp"
                     android:layout_height="44dp"
@@ -40,6 +58,46 @@
                     android:contentDescription="@string/add_link"
                     android:src="@drawable/ic_add"
                     android:tint="@color/text" />
+            </LinearLayout>
+
+            <!-- 曲库多选操作栏（默认隐藏） -->
+            <LinearLayout
+                android:id="@+id/lib_sel_bar"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tv_lib_sel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="@color/pink"
+                    android:textSize="13sp" />
+
+                <ImageButton
+                    android:id="@+id/btn_lib_del_sel"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@null"
+                    android:contentDescription="@string/lib_delete_sel"
+                    android:src="@drawable/ic_delete"
+                    android:tint="@color/pink"
+                    android:visibility="gone" />
+
+                <ImageButton
+                    android:id="@+id/btn_lib_cancel_sel"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@null"
+                    android:contentDescription="@string/lib_cancel_sel"
+                    android:src="@drawable/ic_close"
+                    android:tint="@color/text"
+                    android:visibility="gone" />
             </LinearLayout>
 
             <LinearLayout

@@ -34,6 +34,7 @@
 | A2 | 复制整段分享文案，粘贴导入；自动识别 `BV号 / av号 / b23.tv短链 / 完整链接` | 用户 | v1.0.0 | 正则从任意文本提取多种链接形态；短链先 HEAD 跟随 302 拿真实 BV 号 | `api/Bili.resolve`、`api/Importer` |
 | A3 | 多 P 视频按分 P 精确导入，曲目 id = `bvid_pN` | 用户 | v1.0.0 | 解析 `view` 接口取全部分页，逐页入库；播放时按 page 定位对应 cid | `api/Bili`、`db/Db.upsert` |
 | A4 | 填 Cookie 解锁 192K 高码率 | 用户 | v1.0.0 | 设置页保存 SESSDATA 等，`Http` 全局 CookieManager 带出 | `ui/SettingsActivity`、`net/Http` |
+| A5 | 系统「打开方式」里的两个 BMusic 入口提供图形+文字指引（原两个都叫 BMusic 分不清） | 用户 | v1.0.9 | intent-filter 级 `android:label`/`android:icon` 覆盖：MainActivity=「打开 BMusic 播放」(▶ 徽标 `ic_badge_play`，进应用导入)，ShareActivity=「添加到 BMusic 曲库」(+ 徽标 `ic_badge_add`，弹快捷菜单) | `AndroidManifest`、`drawable/ic_badge_*` |
 
 ### B. 播放核心
 
@@ -111,6 +112,15 @@
 | H6 | 分屏/浮窗每次改尺寸都重建 Activity | 自主 | v1.0.5 | `configChanges` 漏了 `smallestScreenSize`，补齐后不再重建 |
 | H7 | 冷启动后播放队列页为空（服务未运行，`PlaybackService.get()` 为 null） | 自主 | v1.0.6 | 新增 `PlaybackService.wake()`（无 action 的 `startForegroundService`，onCreate 会 restore 队列）；MainActivity/PlayerActivity/QueueActivity 按需唤醒 |
 | H8 | 布局属性 `hintTextColor` 不存在 | 自主 | v1.0.4 | 改用 `android:textColorHint` |
+| H9 | 桌面小组件点按钮无反应（`Background start not allowed: ... startFg?=false`） | 自主 | v1.0.9 | Android 12+ 从桌面 `PendingIntent.getService` 启动服务被拦截；API 26+ 改用 `PendingIntent.getForegroundService`（服务 onCreate 即 startForeground，满足 5s 要求），API 24/25 仍走 getService |
+| H10 | b23.tv 短链走不进 App（`query-activities` 查不到 BMusic） | 自主 | v1.0.9 | 同一 intent-filter 内多个 `<data>` 是合并求交：`/video/` pathPrefix 约束被应用到 `b23.tv` 上。把 b23.tv / www.b23.tv 拆成独立 intent-filter（无 path 约束）后短链恢复匹配 |
+
+### I. 桌面小组件（v1.0.9）
+
+| ID | 需求 | 来源 | 版本 | 实现方式 |
+| :-- | :-- | :-- | :-- | :-- |
+| W1 | 2×2 桌面小组件，只有一个大号播放/暂停按钮；点按钮以外的空间进入播放页 | 用户 | v1.0.9 | `ui/WidgetProvider`（AppWidgetProvider）：根布局 PendingIntent → PlayerActivity（NEW_TASK|SINGLE_TOP），居中 120dp 粉色圆钮 PendingIntent → 服务 `A_TOGGLE`；`res/xml/widget_play_info.xml`（minWidth/Height 110dp）+ `layout/widget_play.xml` + `drawable/widget_bg|widget_btn` |
+| W2 | 小组件图标实时反映播放状态 | 自主 | v1.0.9 | 服务 `ACT_STATE` 广播（包内显式）加入 WidgetProvider intent-filter，onReceive 里 refreshAll；`onUpdate` 初始渲染按 `PlaybackService.get().isPlaying()` 取图标（服务未运行显示播放键） |
 
 ---
 
@@ -141,6 +151,7 @@
 | 21 | 队列清空 + 多选批量删除 | v1.0.8 | 顶栏 ✓/🗑，checkbox 多选，clearQueue/removeIds |
 | 22 | 最近与我的拆分 | v1.0.8 | 四 tab 导航 |
 | 23 | 应用内更新（GitHub 直链） | v1.0.8 | DownloadManager + 安装器拉起 |
+| 24 | 桌面 2×2 播放/暂停小组件（点空白进播放页） | v1.0.9 | `WidgetProvider` + ACT_STATE 同步图标；toggle 用 getForegroundService 绕过后台启动限制 |
 
 ---
 
@@ -148,8 +159,9 @@
 
 - **全部需求**均已在真机（OPPO N6 Android 16 / Samsung Note8 Android 9）完成功能验证；
 - v1.0.7「返回 B 站」在 Note8 上验证菜单项与跳转；v1.0.8 的八项（自动缓存/歌词过滤/布局重排/队列批量操作/四页导航/应用更新）在 Note8 验证，更新链路实测到系统安装器弹出；
+- v1.0.9 桌面小组件已在 Note8 验证：添加到桌面、按钮播放/暂停切换（`dumpsys media_session` state 2↔3）、图标随 ACT_STATE 同步、点按钮外空间打开播放页且播放不间断；
 - 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）。
 
 ---
 
-<p align="center"><sub>BMusic requirements · 更新于 v1.0.8</sub></p>
+<p align="center"><sub>BMusic requirements · 更新于 v1.0.9</sub></p>

@@ -1,0 +1,6 @@
+{
+  "versionCode": 10,
+  "versionName": "1.0.9",
+  "notes": "1.桌面2×2播放/暂停小组件，点空白进播放页\\n2.扫码添加：摄像头扫码+相册图片识别，离线纯Java解码\\n3.粘贴链接快速添加（B站分享复制链接后一键入库）\\n4.曲库批量：多选删除/一键清空\\n5.检查更新：版本比对+更新介绍页\\n6.修复b23.tv短链无法从微信打开的问题",
+  "url": "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk"
+}
