@@ -133,11 +133,8 @@ public class TrackAdapter extends BaseAdapter {
         } else {
             h.title.setText(title);
         }
-        // 副标题：分 P 名 · 视频页标题（原始信息）
+        // 副标题：分 P 名 · 视频页标题（原始信息）；超宽文字由 MarqueeTextView 往复滚动
         h.sub.setText(t.listSub());
-        // 显示不下的文字缓慢滚动（跑马灯需要 selected 才会启动）
-        h.title.setSelected(true);
-        h.sub.setSelected(true);
         h.dur.setText(t.duration > 0 ? Track.fmt(t.duration) : "--:--");
         Integer pct = progress.get(t.id);
         if (pct != null) {

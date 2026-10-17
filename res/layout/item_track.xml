@@ -49,13 +49,12 @@
                 android:tint="@color/pink"
                 android:visibility="gone" />
 
-            <TextView
+            <com.volcano.bmusic.ui.MarqueeTextView
                 android:id="@+id/title"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:ellipsize="marquee"
-                android:marqueeRepeatLimit="marquee_forever"
+                android:ellipsize="none"
                 android:singleLine="true"
                 android:text="标题"
                 android:textColor="@color/text"
@@ -76,14 +75,13 @@
                 android:tint="@color/green"
                 android:visibility="gone" />
 
-            <TextView
+            <com.volcano.bmusic.ui.MarqueeTextView
                 android:id="@+id/sub"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="5dp"
                 android:layout_weight="1"
-                android:ellipsize="marquee"
-                android:marqueeRepeatLimit="marquee_forever"
+                android:ellipsize="none"
                 android:singleLine="true"
                 android:text=""
                 android:textColor="@color/text_dim"

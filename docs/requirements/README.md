@@ -181,7 +181,7 @@
 | 48 | 扫码换 ZXing 成熟解码器 | v1.0.16 | vendored `com.google.zxing` QR 子集（3.3.3，Apache 2.0，50 文件）；`QrDecoder` 薄壳：`GraySource` 适配灰度 `int[]` + Global/Hybrid/反色四路尝试；JVM 可直接单测 |
 | 49 | 列表副标题显示原始信息 + 播放次数淡色徽章 | v1.0.17 | `Track.listSub()` 改为「分P名 · 视频页标题」（单P去重）；播放次数用 `SpannableString`（text_dim 色 + 0.8 倍字号）附在主标题后（`·N次`），不显示则播放数为 0 |
 | 50 | 播放列表选择逻辑复用曲库 + 导航入口 | v1.0.17 | `QueueActivity`：头部垃圾桶改「删除所选」（未勾选置灰禁用），新增选择栏「全选/反选/取消」（复用曲库样式），移除「清空队列」；底部导航在歌单与最近之间插入「播放列表」tab（直接拉起 QueueActivity，歌单图标换心形） |
-| 51 | 显示不下的文字缓慢滚动而非省略号 | v1.0.17 | `item_track.xml` title/sub 改 `ellipsize=marquee` + `marqueeRepeatLimit=marquee_forever`，`TrackAdapter.getView` 里 `setSelected(true)`（跑马灯需 selected 才启动） |
+| 51 | 显示不下的文字往复滚动而非省略号 | v1.0.17 | 自定义 `ui/MarqueeTextView`（title/sub 替换使用）：Handler+系统时钟按真实时间推进 scrollX，往复「向左滚出右边 → 停 → 向右滚回左边 → 停」（≈30px/s，两端停 1.5s）。不能用 ValueAnimator——设备关动画时 `animator_duration_scale=0` 会瞬间播完；也不能用内置 marquee——只向左循环。注意 `setScrollX` 不触发重绘需手动 `invalidate`，且列表高频重复 bind 同一行时不要重启动画 |
 
 ---
 
