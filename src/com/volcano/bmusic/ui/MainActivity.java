@@ -185,6 +185,13 @@ public class MainActivity extends Activity {
                 }
             }, 400);
         }
+        // 播放页「曲库」按钮带回的目标页（0=曲库）
+        if (i.hasExtra("page")) {
+            int p = i.getIntExtra("page", 0);
+            if (p < 0) p = 0;
+            if (p > 3) p = 3;
+            select(p);
+        }
     }
 
     private void bind() {

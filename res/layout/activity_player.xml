@@ -20,41 +20,40 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingLeft="14dp"
-            android:paddingRight="14dp">
-
-            <!-- 曲库入口（原返回箭头），风格与底部操作按钮一致 -->
-            <Button
-                android:id="@+id/back"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:background="@drawable/ripple_round"
-                android:drawableLeft="@drawable/ic_library"
-                android:drawablePadding="6dp"
-                android:drawableTint="@color/text"
-                android:minWidth="0dp"
-                android:paddingLeft="14dp"
-                android:paddingRight="14dp"
-                android:text="曲库"
-                android:textAllCaps="false"
-                android:textColor="@color/text"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <!-- 缓存 + 返回B站：放在播放画面上方 -->
+        <!-- 封面上方一行：曲库入口 / 缓存 / 返回B站（同一风格） -->
         <LinearLayout
             android:id="@+id/row_top"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="40dp"
-            android:layout_marginRight="40dp"
+            android:layout_marginLeft="14dp"
+            android:layout_marginRight="14dp"
+            android:layout_marginTop="12dp"
             android:gravity="center"
             android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/back"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:background="@drawable/ripple_round"
+                android:drawableLeft="@drawable/ic_library"
+                android:drawablePadding="6dp"
+                android:drawableTint="@color/text_sub"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:minWidth="0dp"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:singleLine="true"
+                android:text="曲库"
+                android:textAllCaps="false"
+                android:textColor="@color/text_sub"
+                android:textSize="12sp" />
+
+            <View
+                android:layout_width="8dp"
+                android:layout_height="1dp" />
 
             <Button
                 android:id="@+id/btn_cache"
@@ -67,15 +66,15 @@
                 android:drawableTint="@color/text_sub"
                 android:gravity="center"
                 android:minWidth="0dp"
-                android:paddingLeft="10dp"
-                android:paddingRight="10dp"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
                 android:text="缓存到本地"
                 android:textAllCaps="false"
                 android:textColor="@color/text_sub"
                 android:textSize="12sp" />
 
             <View
-                android:layout_width="12dp"
+                android:layout_width="8dp"
                 android:layout_height="1dp" />
 
             <Button
@@ -89,8 +88,8 @@
                 android:drawableTint="@color/text_sub"
                 android:gravity="center"
                 android:minWidth="0dp"
-                android:paddingLeft="10dp"
-                android:paddingRight="10dp"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
                 android:text="返回 B 站"
                 android:textAllCaps="false"
                 android:textColor="@color/text_sub"
@@ -277,10 +276,30 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
-                android:layout_marginLeft="16dp"
-                android:layout_marginRight="16dp"
                 android:gravity="center"
                 android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_queue"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1.5"
+                    android:background="@drawable/ripple_round"
+                    android:drawableLeft="@drawable/ic_queue"
+                    android:drawablePadding="6dp"
+                    android:drawableTint="@color/text_sub"
+                    android:gravity="center"
+                    android:minWidth="0dp"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:text="@string/current_queue"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_sub"
+                    android:textSize="12sp" />
+
+                <View
+                    android:layout_width="8dp"
+                    android:layout_height="1dp" />
 
                 <Button
                     android:id="@+id/btn_add_pl"
@@ -295,10 +314,10 @@
                     android:minWidth="0dp"
                     android:paddingLeft="8dp"
                     android:paddingRight="8dp"
-                android:text="加入歌单"
-                android:textAllCaps="false"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
+                    android:text="加入歌单"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_sub"
+                    android:textSize="12sp" />
 
                 <View
                     android:layout_width="8dp"
@@ -321,28 +340,6 @@
                     android:textAllCaps="false"
                     android:textColor="@color/text_sub"
                     android:textSize="12sp" />
-
-                <View
-                    android:layout_width="8dp"
-                    android:layout_height="1dp" />
-
-                <Button
-                    android:id="@+id/btn_queue"
-                    android:layout_width="0dp"
-                    android:layout_height="38dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/ripple_round"
-                    android:drawableLeft="@drawable/ic_queue"
-                    android:drawablePadding="6dp"
-                    android:drawableTint="@color/text_sub"
-                    android:gravity="center"
-                    android:minWidth="0dp"
-                    android:paddingLeft="8dp"
-                    android:paddingRight="8dp"
-                    android:text="@string/current_queue"
-                    android:textAllCaps="false"
-                    android:textColor="@color/text_sub"
-                    android:textSize="12sp" />
             </LinearLayout>
 
             <TextView
@@ -354,7 +351,8 @@
                 android:gravity="center"
                 android:text=""
                 android:textColor="@color/text_dim"
-                android:textSize="11sp" />
+                android:textSize="11sp"
+                android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 

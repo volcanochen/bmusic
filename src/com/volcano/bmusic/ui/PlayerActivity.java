@@ -14,6 +14,7 @@ import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.Layout;
+import android.text.TextPaint;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.EditText;
@@ -199,6 +200,8 @@ public class PlayerActivity extends Activity {
         if (btnNext != null) setSize(btnNext, compact ? 44 : 52, compact ? 44 : 52);
         if (btnMode != null) setSize(btnMode, compact ? 40 : 48, compact ? 40 : 48);
         if (btnFav != null) setSize(btnFav, compact ? 40 : 48, compact ? 40 : 48);
+        View backBtn = findViewById(R.id.back);
+        if (backBtn != null) setHeight(backBtn, compact ? 34 : 38);
         if (btnCache != null) setHeight(btnCache, compact ? 34 : 38);
         View addPl = findViewById(R.id.btn_add_pl);
         if (addPl != null) setHeight(addPl, compact ? 34 : 38);
@@ -219,36 +222,65 @@ public class PlayerActivity extends Activity {
         if (title != null) title.setTextSize(tiny ? 16 : (landLayout ? 19 : 18));
         if (author != null) author.setTextSize(tiny ? 11 : 13);
 
-        // Status line is the first thing to go when space is really tight.
-        if (hint != null) hint.setVisibility(tiny ? View.GONE : View.VISIBLE);
+        // 底部状态行已按需求移除：不再显示「已缓存 / 在线播放」等文字
+        if (hint != null) hint.setVisibility(View.GONE);
     }
 
     /**
-     * Keep the three action labels readable in a cramped window. Icons are the
-     * first thing to give up: if any label ends up clipped after the layout
-     * pass, we drop all three leading icons and try again. It runs after
-     * layout so the decision is based on the real measured width, which makes
-     * it correct for any window size instead of a hard-coded threshold.
+     * Keep the action labels readable in a cramped window. Icons are never
+     * dropped; when a label does not fit we shrink its font (down to 9sp)
+     * based on real measured text width, so system font scale is respected.
      */
     private void tuneActionButtons(boolean compact) {
         final View addPl = findViewById(R.id.btn_add_pl);
-        tuneButton(btnCache, cacheIcon, compact, compact);
-        tuneButton((Button) addPl, plIcon, compact, compact);
-        tuneButton(btnLyric, lyricIcon, compact, compact);
-        tuneButton(btnQueue, queueIcon, compact, compact);
-        tuneButton(btnBili, biliIcon, compact, compact);
-        if (compact) return;
+        tuneButton(btnCache, cacheIcon, false, compact);
+        tuneButton((Button) addPl, plIcon, false, compact);
+        tuneButton(btnLyric, lyricIcon, false, compact);
+        tuneButton(btnQueue, queueIcon, false, compact);
+        tuneButton(btnBili, biliIcon, false, compact);
         final View row = findViewById(R.id.row_bottom);
         if (row == null) return;
+        // 双层 post：第一层可能在首次遍历前出队，第二层保证落在布局完成之后
         row.post(new Runnable() {
             @Override
             public void run() {
-                if (!isClipped(btnCache) && !isClipped(addPl) && !isClipped(btnLyric)) return;
-                tuneButton(btnCache, cacheIcon, true, true);
-                tuneButton((Button) addPl, plIcon, true, true);
-                tuneButton(btnLyric, lyricIcon, true, true);
+                row.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        fitButton((Button) findViewById(R.id.back));
+                        fitButton(btnCache);
+                        fitButton((Button) findViewById(R.id.btn_bili));
+                        fitButton((Button) addPl);
+                        fitButton(btnLyric);
+                        fitButton(btnQueue);
+                    }
+                });
             }
         });
+    }
+
+    /**
+     * Shrink a button's font (12sp -> 9sp, 0.5sp steps) until the text plus
+     * its leading icon fits the measured button width. Never touches icons.
+     */
+    private void fitButton(Button b) {
+        if (b == null || b.getWidth() <= 0) return;
+        Drawable[] ds = b.getCompoundDrawables();
+        Drawable d = (ds == null || ds.length == 0) ? null : ds[0];
+        int fixed = (d != null ? d.getIntrinsicWidth() + b.getCompoundDrawablePadding() : 0)
+                + b.getPaddingLeft() + b.getPaddingRight();
+        int avail = b.getWidth() - fixed;
+        if (avail <= 0) return;
+        String t = b.getText().toString();
+        TextPaint tmp = new TextPaint(b.getPaint());
+        float scaled = getResources().getDisplayMetrics().scaledDensity;
+        float chosen = 9f;
+        for (float s = 12f; s >= 9f; s -= 0.5f) {
+            tmp.setTextSize(s * scaled);
+            chosen = s;
+            if (tmp.measureText(t) <= avail) break;
+        }
+        b.setTextSize(chosen); // SP 单位，走 TextView 正规路径触发重新排版
     }
 
     private void tuneButton(Button b, Drawable icon, boolean iconless, boolean smallText) {
@@ -257,13 +289,6 @@ public class PlayerActivity extends Activity {
         b.setEllipsize(TextUtils.TruncateAt.END);
         b.setTextSize(smallText ? 11 : 12);
         b.setCompoundDrawables(iconless ? null : icon, null, null, null);
-    }
-
-    /** True when a label had to be truncated to fit its button. */
-    private static boolean isClipped(View v) {
-        if (!(v instanceof TextView)) return false;
-        Layout l = ((TextView) v).getLayout();
-        return l != null && l.getEllipsisCount(0) > 0;
     }
 
     /** Set a child's top margin in dp (-1 = keep the value from the layout). */
@@ -386,7 +411,12 @@ public class PlayerActivity extends Activity {
         findViewById(R.id.back).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                onBackPressed();
+                // 回到主界面并定位到「曲库」页，保持入口逻辑一致
+                Intent i = new Intent(PlayerActivity.this, MainActivity.class);
+                i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                i.putExtra("page", 0);
+                startActivity(i);
+                finish();
             }
         });
         // 曲库入口按钮显示曲库总数：「曲库 · N」
