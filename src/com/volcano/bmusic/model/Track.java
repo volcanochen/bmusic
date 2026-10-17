@@ -82,10 +82,23 @@ public class Track implements Serializable {
         return a + " - " + displayTitle();
     }
 
-    /** 列表副标题（小字）：专辑；未解析到写 Unknown。 */
+    /**
+     * 列表副标题（小字）：分 P 名 · 视频页标题（原始信息，推断不准时以源为准）。
+     * 分 P 名与视频标题相同（单 P）时只显示一个。
+     */
     public String listSub() {
-        if (album != null && !album.isEmpty()) return album;
-        return "Unknown";
+        String src = srcTitle == null ? "" : srcTitle.trim();
+        String part = title == null ? "" : title.trim();
+        StringBuilder sb = new StringBuilder();
+        if (!part.isEmpty()) sb.append(part);
+        if (!src.isEmpty() && !src.equals(part)) {
+            if (sb.length() > 0) sb.append(" · ");
+            sb.append(src);
+        }
+        if (sb.length() == 0) {
+            return author == null ? "" : author;
+        }
+        return sb.toString();
     }
 
     /** 是否已经推断过歌手/歌名。 */

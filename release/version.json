@@ -1,7 +1,6 @@
 {
-  "versionCode": 17,
-  "versionName": "1.0.16",
-  "notes": "1.扫码解码器换为 ZXing core 的 QR 子集（Apache 2.0，仅 50 文件）：识别率对齐主流扫码 App，白底/深底、各纠错级、长链接全覆盖\n2.体积仅增 33KB（218→251KB）\n3.已验证：JVM 样张 + Note8 相册识别真码端到端导入成功",
+  "versionCode": 18,
+  "versionName": "1.0.17",
+  "notes": "1.列表副标题改为原始信息「分P名 · 视频页标题」，不再显示推断的专辑\n2.播放次数以淡色小字显示在主标题后面（·N次）\n3.播放列表（队列）选择逻辑复用曲库：清空按钮改为「删除所选」（未勾选置灰）+ 全选/反选/取消\n4.底部导航新增「播放列表」入口（歌单与最近之间）",
   "url": "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk"
 }
-

@@ -146,4 +146,4 @@ A：支持。播放走前台服务，息屏、锁屏、后台运行都不中断�
 
 ---
 
-<p align="center"><sub>Made with ☕ and no Gradle · BMusic v1.0.16</sub></p>
+<p align="center"><sub>Made with ☕ and no Gradle · BMusic v1.0.17</sub></p>

@@ -4,6 +4,7 @@
     <string name="app_sub">B站音频后台播放器</string>
     <string name="tab_tracks">曲库</string>
     <string name="tab_playlists">歌单</string>
+    <string name="tab_queue">播放列表</string>
     <string name="tab_recent">最近</string>
     <string name="tab_settings">我的</string>
     <string name="play">播放</string>

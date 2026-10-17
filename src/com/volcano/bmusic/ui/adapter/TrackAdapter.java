@@ -118,10 +118,26 @@ public class TrackAdapter extends BaseAdapter {
             h = (Holder) v.getTag();
         }
         final Track t = data.get(position);
-        h.title.setText(t.listTitle());
-        String suffix = "";
-        if (t.plays > 0) suffix = "  ·  播过" + t.plays + "次";
-        h.sub.setText(t.listSub() + suffix);
+        // 主标题后附播放次数（淡色小字，不抢视线）
+        String title = t.listTitle();
+        if (t.plays > 0) {
+            String badge = " · " + t.plays + "次";
+            android.text.SpannableString ss = new android.text.SpannableString(title + badge);
+            int s = title.length();
+            ss.setSpan(new android.text.style.ForegroundColorSpan(
+                            ctx.getResources().getColor(R.color.text_dim)),
+                    s, ss.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            ss.setSpan(new android.text.style.RelativeSizeSpan(0.8f),
+                    s, ss.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            h.title.setText(ss);
+        } else {
+            h.title.setText(title);
+        }
+        // 副标题：分 P 名 · 视频页标题（原始信息）
+        h.sub.setText(t.listSub());
+        // 显示不下的文字缓慢滚动（跑马灯需要 selected 才会启动）
+        h.title.setSelected(true);
+        h.sub.setSelected(true);
         h.dur.setText(t.duration > 0 ? Track.fmt(t.duration) : "--:--");
         Integer pct = progress.get(t.id);
         if (pct != null) {

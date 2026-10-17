@@ -798,7 +798,7 @@
                 android:id="@+id/icon_playlists"
                 android:layout_width="22dp"
                 android:layout_height="22dp"
-                android:src="@drawable/ic_queue"
+                android:src="@drawable/ic_fav_border"
                 android:tint="@color/text_dim" />
 
             <TextView
@@ -806,6 +806,28 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/tab_playlists" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tab_queue"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/icon_queue"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_queue"
+                android:tint="@color/text_dim" />
+
+            <TextView
+                style="@style/TabText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/tab_queue" />
         </LinearLayout>
 
         <LinearLayout

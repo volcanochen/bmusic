@@ -45,33 +45,79 @@
             android:layout_width="44dp"
             android:layout_height="44dp"
             android:background="@null"
-            android:contentDescription="清空队列"
+            android:contentDescription="删除所选"
             android:src="@drawable/ic_delete"
-            android:tint="@color/text_sub" />
+            android:tint="@color/text_sub"
+            android:enabled="false"
+            android:alpha="0.35" />
+    </LinearLayout>
+
+    <!-- 队列多选操作栏（复用曲库逻辑：全选/反选/取消，默认隐藏） -->
+    <LinearLayout
+        android:id="@+id/queue_sel_bar"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="10dp"
+        android:paddingRight="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tv_queue_sel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/pink"
+            android:textSize="13sp" />
 
         <Button
-            android:id="@+id/btn_delete_sel"
+            android:id="@+id/btn_queue_sel_all"
             android:layout_width="wrap_content"
-            android:layout_height="34dp"
+            android:layout_height="30dp"
+            android:layout_marginLeft="4dp"
             android:background="@drawable/ripple_round"
+            android:gravity="center"
             android:minWidth="0dp"
-            android:paddingLeft="14dp"
-            android:paddingRight="14dp"
-            android:text="删除"
+            android:minHeight="0dp"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:text="@string/lib_sel_all"
             android:textAllCaps="false"
-            android:textColor="@color/pink"
-            android:textSize="13sp"
-            android:visibility="gone" />
+            android:textColor="@color/text"
+            android:textSize="11sp" />
 
-        <ImageButton
-            android:id="@+id/btn_cancel_sel"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="@null"
-            android:contentDescription="取消多选"
-            android:src="@drawable/ic_close"
-            android:tint="@color/text"
-            android:visibility="gone" />
+        <Button
+            android:id="@+id/btn_queue_sel_inv"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_marginLeft="4dp"
+            android:background="@drawable/ripple_round"
+            android:gravity="center"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:text="@string/lib_sel_inv"
+            android:textAllCaps="false"
+            android:textColor="@color/text"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/btn_queue_cancel"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_marginLeft="4dp"
+            android:background="@drawable/ripple_round"
+            android:gravity="center"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:text="取消"
+            android:textAllCaps="false"
+            android:textColor="@color/text"
+            android:textSize="11sp" />
     </LinearLayout>
 
     <FrameLayout

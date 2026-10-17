@@ -295,6 +295,13 @@ public class MainActivity extends Activity {
         final TextView t4 = (TextView) ((ViewGroup) findViewById(R.id.tab_me)).getChildAt(1);
         tabTexts = new TextView[]{t1, t2, t3, t4};
         View[] pages = {pageTracks, pagePlaylists, pageRecent, pageMe};
+        // 播放列表（队列）是独立页面：tab 直接拉起 QueueActivity（歌单与最近之间）
+        findViewById(R.id.tab_queue).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(MainActivity.this, QueueActivity.class));
+            }
+        });
         for (int i = 0; i < 4; i++) {
             final int idx = i;
             View tab = findViewById(tabs[i][0]);

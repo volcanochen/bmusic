@@ -39,8 +39,8 @@ public class QueueActivity extends Activity {
     private boolean selectMode = false;
     private View btnSelect;
     private View btnClear;
-    private View btnDeleteSel;
-    private View btnCancelSel;
+    private View selBar;
+    private TextView tvSel;
 
     private static final String[] ITEMS = {"立即播放", "上移", "下移", "缓存到本地",
             "加入歌单", "返回 B 站", "从队列移除", "删除曲目"};
@@ -54,8 +54,8 @@ public class QueueActivity extends Activity {
         nameView = (TextView) findViewById(R.id.name);
         btnSelect = findViewById(R.id.btn_select);
         btnClear = findViewById(R.id.btn_clear);
-        btnDeleteSel = findViewById(R.id.btn_delete_sel);
-        btnCancelSel = findViewById(R.id.btn_cancel_sel);
+        selBar = findViewById(R.id.queue_sel_bar);
+        tvSel = (TextView) findViewById(R.id.tv_queue_sel);
         adapter = new TrackAdapter(this, new TrackAdapter.Listener() {
             @Override
             public void onPlay(List<Track> l, int pos) {
@@ -82,7 +82,7 @@ public class QueueActivity extends Activity {
         btnClear.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                confirmClear();
+                deleteSelected();
             }
         });
         btnSelect.setOnClickListener(new View.OnClickListener() {
@@ -91,70 +91,89 @@ public class QueueActivity extends Activity {
                 setSelectMode(true);
             }
         });
-        btnCancelSel.setOnClickListener(new View.OnClickListener() {
+        findViewById(R.id.btn_queue_sel_all).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                selectAll();
+            }
+        });
+        findViewById(R.id.btn_queue_sel_inv).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                invertSelected();
+            }
+        });
+        findViewById(R.id.btn_queue_cancel).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 setSelectMode(false);
             }
         });
-        btnDeleteSel.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                deleteSelected();
-            }
-        });
         load();
     }
 
-    /** 进入/退出多选模式。 */
+    /** 进入/退出多选模式（复用曲库逻辑：选择栏 + 头部删除按钮灰度）。 */
     private void setSelectMode(boolean on) {
         selectMode = on;
         selected.clear();
         adapter.setSelectable(on ? selected : null);
         btnSelect.setVisibility(on ? View.GONE : View.VISIBLE);
-        btnClear.setVisibility(on ? View.GONE : View.VISIBLE);
-        btnDeleteSel.setVisibility(on ? View.VISIBLE : View.GONE);
-        btnCancelSel.setVisibility(on ? View.VISIBLE : View.GONE);
+        selBar.setVisibility(on ? View.VISIBLE : View.GONE);
         updateSelectionBar();
     }
 
     private void updateSelectionBar() {
         if (selectMode) {
-            nameView.setText("已选 " + selected.size() + " / " + data.size());
-            btnDeleteSel.setEnabled(!selected.isEmpty());
-            btnDeleteSel.setAlpha(selected.isEmpty() ? 0.4f : 1f);
+            tvSel.setText("已选 " + selected.size() + " / " + data.size());
         } else {
             nameView.setText(getString(R.string.current_queue)
                     + "（" + data.size() + "）");
         }
+        // 头部垃圾桶 = 删除所选：未勾选时置灰禁用（与曲库一致）
+        boolean has = !selected.isEmpty();
+        btnClear.setEnabled(has);
+        btnClear.setAlpha(has ? 1f : 0.35f);
+    }
+
+    /** 勾选模式：全选当前队列。 */
+    private void selectAll() {
+        if (!selectMode || adapter == null) return;
+        for (Track t : adapter.data()) {
+            if (t.id != null) selected.add(t.id);
+        }
+        adapter.setSelectable(selected);
+        updateSelectionBar();
+    }
+
+    /** 勾选模式：反选（已勾的取消、未勾的选中）。 */
+    private void invertSelected() {
+        if (!selectMode || adapter == null) return;
+        for (Track t : adapter.data()) {
+            if (t.id == null) continue;
+            if (selected.contains(t.id)) selected.remove(t.id);
+            else selected.add(t.id);
+        }
+        adapter.setSelectable(selected);
+        updateSelectionBar();
     }
 
     private void deleteSelected() {
-        if (selected.isEmpty()) return;
+        if (selected.isEmpty()) {
+            Toast.makeText(this, "请先勾选要删除的曲目", Toast.LENGTH_SHORT).show();
+            return;
+        }
         final int n = selected.size();
         new android.app.AlertDialog.Builder(this)
-                .setMessage("从队列删除选中的 " + n + " 首？")
+                .setMessage("从播放列表移除选中的 " + n + " 首？\n（只移出列表，不从曲库删除）")
                 .setPositiveButton("删除", new android.content.DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(android.content.DialogInterface d, int w) {
                         PlaybackService.removeIds(QueueActivity.this,
                                 new ArrayList<String>(selected));
                         Toast.makeText(QueueActivity.this,
-                                "已删除 " + n + " 首", Toast.LENGTH_SHORT).show();
-                        setSelectMode(false);
-                    }
-                })
-                .setNegativeButton("取消", null).show();
-    }
-
-    private void confirmClear() {
-        new android.app.AlertDialog.Builder(this)
-                .setMessage("清空整个播放队列（" + data.size() + " 首）？播放将停止。")
-                .setPositiveButton("清空", new android.content.DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(android.content.DialogInterface d, int w) {
-                        PlaybackService.clearQueue(QueueActivity.this);
-                        Toast.makeText(QueueActivity.this, "队列已清空", Toast.LENGTH_SHORT).show();
+                                "已移除 " + n + " 首", Toast.LENGTH_SHORT).show();
+                        selected.clear();
+                        updateSelectionBar();
                     }
                 })
                 .setNegativeButton("取消", null).show();
