@@ -8,6 +8,17 @@
     android:paddingLeft="14dp"
     android:paddingRight="6dp">
 
+    <CheckBox
+        android:id="@+id/check"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginRight="8dp"
+        android:clickable="false"
+        android:focusable="false"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:visibility="gone" />
+
     <ImageView
         android:id="@+id/art"
         android:layout_width="48dp"

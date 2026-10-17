@@ -61,6 +61,8 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
     public static final String A_QUEUE_KEEP = "bm.a.qkeep";
     /** edit the queue: remove (op 0) or move (op -1 / +1) one entry */
     public static final String A_QUEUE_EDIT = "bm.a.qedit";
+    public static final String A_QUEUE_CLEAR = "bm.a.qclear";
+    public static final String A_QUEUE_RM_IDS = "bm.a.qrids";
 
     public static final String ACT_STATE = "com.volcano.bmusic.STATE";
     public static final String ACT_PROGRESS = "com.volcano.bmusic.PROGRESS";
@@ -151,6 +153,10 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
                 replaceQueue(intent.getLongExtra("pid", -1), qids);
             } else if (A_QUEUE_EDIT.equals(a)) {
                 editQueue(intent.getStringExtra("id"), intent.getIntExtra("op", 0));
+            } else if (A_QUEUE_CLEAR.equals(a)) {
+                clearQueue();
+            } else if (A_QUEUE_RM_IDS.equals(a)) {
+                removeIds(intent.getStringArrayListExtra("ids"));
         } else if (A_APPEND.equals(a)) {
             String id = intent.getStringExtra("id");
             if (id == null) return START_STICKY;
@@ -414,6 +420,35 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         broadcastState();
     }
 
+    /**
+     * 清空整个队列：暂停播放并清掉全部条目（保留当前曲目信息用于展示，
+     * 但队列空了之后切歌按钮自然失效）。
+     */
+    private void clearQueue() {
+        if (queueIds.isEmpty() && cur == null) return;
+        pause();
+        queueIds.clear();
+        index = 0;
+        saveQueue();
+        broadcastState();
+    }
+
+    /** 批量移除队列里的若干曲目（多选删除）。 */
+    private void removeIds(java.util.ArrayList<String> ids) {
+        if (ids == null || ids.isEmpty()) return;
+        String curId = (index >= 0 && index < queueIds.size()) ? queueIds.get(index) : null;
+        queueIds.removeAll(ids);
+        if (queueIds.isEmpty()) {
+            pause();
+            index = 0;
+        } else {
+            index = curId != null ? queueIds.indexOf(curId) : 0;
+            if (index < 0) index = 0;
+        }
+        saveQueue();
+        broadcastState();
+    }
+
     private void openIndex(int i, boolean autoplay) {
         if (queueIds.isEmpty()) return;
         if (i < 0) i = 0;
@@ -428,6 +463,7 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         loading = true;
         startWhenReady = autoplay;
         playing = false;
+        autoCache(t);
         broadcastState();
         refreshNotify();
         requestFocus(new Runnable() {
@@ -436,6 +472,16 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
                 startSource(id);
             }
         });
+    }
+
+    /**
+     * 自动开启缓存：开始播放一首未缓存的曲目时就地排队下载，
+     * 不需要手动点「缓存到本地」。受「仅WiFi缓存」设置约束。
+     */
+    private void autoCache(Track t) {
+        if (t == null || t.hasLocal()) return;
+        if (!com.volcano.bmusic.util.Downloader.autoAllowed(this)) return;
+        com.volcano.bmusic.util.Downloader.start(this, t);
     }
 
     private void requestFocus(final Runnable then) {
@@ -1044,6 +1090,19 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         i.setAction(A_QUEUE_EDIT);
         i.putExtra("id", id);
         i.putExtra("op", op);
+        start(c, i);
+    }
+
+    /** 清空整个播放队列。 */
+    public static void clearQueue(Context c) {
+        act(c, A_QUEUE_CLEAR);
+    }
+
+    /** 批量移除队列中的曲目（多选删除）。 */
+    public static void removeIds(Context c, ArrayList<String> ids) {
+        Intent i = new Intent(c, PlaybackService.class);
+        i.setAction(A_QUEUE_RM_IDS);
+        i.putStringArrayListExtra("ids", ids);
         start(c, i);
     }
 

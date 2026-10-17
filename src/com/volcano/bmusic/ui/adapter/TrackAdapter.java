@@ -5,6 +5,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
+import android.widget.CheckBox;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -32,6 +33,8 @@ public class TrackAdapter extends BaseAdapter {
     private String playingId;
     private boolean playing;
     private final boolean showMore;
+    /** 多选模式：非 null 时行点击 = 勾选/取消，选中的 id 存在该集合里。 */
+    private java.util.Set<String> selected;
 
     public TrackAdapter(Context c, Listener l) {
         this(c, l, true);
@@ -41,6 +44,22 @@ public class TrackAdapter extends BaseAdapter {
         this.ctx = c;
         this.listener = l;
         this.showMore = showMore;
+    }
+
+    public boolean isSelectable() {
+        return selected != null;
+    }
+
+    public void setSelectable(java.util.Set<String> sel) {
+        selected = sel;
+        notifyDataSetChanged();
+    }
+
+    public void toggleSelected(String id) {
+        if (selected == null || id == null) return;
+        if (selected.contains(id)) selected.remove(id);
+        else selected.add(id);
+        notifyDataSetChanged();
     }
 
     public void setData(List<Track> list) {
@@ -93,6 +112,7 @@ public class TrackAdapter extends BaseAdapter {
             h.dur = (TextView) v.findViewById(R.id.dur);
             h.badge = (ImageView) v.findViewById(R.id.badge);
             h.more = (ImageButton) v.findViewById(R.id.more);
+            h.check = (CheckBox) v.findViewById(R.id.check);
             v.setTag(h);
         } else {
             h = (Holder) v.getTag();
@@ -110,10 +130,15 @@ public class TrackAdapter extends BaseAdapter {
         h.badge.setVisibility(t.hasLocal() ? View.VISIBLE : View.GONE);
         boolean isCur = t.id != null && t.id.equals(playingId);
         if (h.now != null) h.now.setVisibility(isCur ? View.VISIBLE : View.GONE);
+        boolean picked = selected != null && t.id != null && selected.contains(t.id);
+        if (h.check != null) {
+            h.check.setVisibility(selected != null ? View.VISIBLE : View.GONE);
+            h.check.setChecked(picked);
+        }
         h.title.setTextColor(ctx.getResources().getColor(
-                isCur ? R.color.pink : R.color.text));
+                isCur || picked ? R.color.pink : R.color.text));
         h.sub.setTextColor(ctx.getResources().getColor(
-                isCur ? R.color.pink : R.color.text_dim));
+                isCur || picked ? R.color.pink : R.color.text_dim));
         h.art.setImageResource(R.drawable.ic_music_note);
         h.art.setTag(null);
         CoverLoader.get(ctx).load(h.art, t.cover);
@@ -149,5 +174,6 @@ public class TrackAdapter extends BaseAdapter {
         TextView dur;
         ImageView badge;
         ImageButton more;
+        CheckBox check;
     }
 }

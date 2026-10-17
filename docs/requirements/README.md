@@ -57,6 +57,8 @@
 | C5 | 迷你条显示播放状态并提醒播放事件（缓冲中/播放中/已暂停 + 进度线），标题切换动画过渡 | 用户 | v1.0.6 | 状态驱动文案与图标；进度线随下载/播放进度填充；标题/副标题淡入淡出+位移（`animateText`），播放键脉冲缩放 | `ui/MainActivity.refreshMini` |
 | C6 | 播放页「播放队列」按钮移到底部方便点击 | 用户 | v1.0.6 | 从顶部标题栏移到播放页底部操作区 | `res/layout/activity_player*.xml` |
 | C7 | 播放页底部「返回 B 站」按钮 | 用户 | v1.0.7 | 与「播放队列」并排（各占 50%），点击 `ACTION_VIEW` 跳转 B 站 | `ui/PlayerActivity`、`res/drawable/ic_bili` |
+| C8 | 最近播放与「我的」拆成两个独立入口/页面 | 用户 | v1.0.8 | 底部导航变四页（曲库/歌单/最近/我的）；`page_recent` 独立页（标题+全屏列表），`page_me` 只留空间管理/设置/应用更新 | `res/layout/activity_main.xml`、`ui/MainActivity.initTabs/select` |
+| C9 | 「我的」页提供应用内更新（GitHub 直链始终最新） | 用户 | v1.0.8 | 系统自带 `DownloadManager` 下载 release/bmusic.apk（带通知+完成态），轮询状态成功后 `getUriForDownloadedFile` + `ACTION_VIEW` 拉起安装器；manifest 加 `REQUEST_INSTALL_PACKAGES`；首次安装需用户在系统里允许「安装未知应用」 | `ui/MainActivity.startAppUpdate/pollUpdate/installApk`、`AndroidManifest` |
 
 ### D. 播放队列与曲库操作
 
@@ -68,6 +70,8 @@
 | D4 | 曲库「播放 N 首」：当前筛选范围全部导入播放列表并播放 | 用户 | v1.0.6 | `replaceQueue`（A_QUEUE_KEEP）：整体替换队列内容但保留正在播放的曲目不打断；当前曲在筛选结果内则继续播，否则从第一首播 | `ui/MainActivity.playFiltered`、`player/PlaybackService` |
 | D5 | 队列编辑：上移 / 下移 / 移除 | 用户 | v1.0.6 | `editQueue(id, op)`：op=0 移除、∓1 移动；重算 index 保持当前曲不跳变并持久化 | `player/PlaybackService.editQueue` |
 | D6 | 曲目「返回 B 站」：从曲库/歌单/队列跳回 B 站该曲目页面 | 用户 | v1.0.7 | `TrackActions.openBili`：按 `bvid` 组装 `https://www.bilibili.com/video/BVxxx`，多 P 追加 `?p=N`；`ACTION_VIEW` 由系统分发到浏览器或 B 站 App；四个列表菜单与播放页按钮统一接入 | `ui/TrackActions.openBili`、四个 Activity 菜单 |
+| D7 | 队列控制行为：清空队列 + 勾选曲目批量删除 | 用户 | v1.0.8 | 顶栏 ✓ 进入多选（行首 checkbox、标题显示「已选 n/N」、批量删除确认框）、🗑 清空（确认框，清空并暂停）；服务端 `clearQueue()` / `removeIds()`（A_QUEUE_CLEAR / A_QUEUE_RM_IDS） | `ui/QueueActivity`、`player/PlaybackService`、`adapter/TrackAdapter`（多选支持） |
+| D8 | 播放页布局重排：缓存+返回B站上移至封面之上，下方一行=加入歌单/歌词/播放队列；顶部返回箭头改为「曲库 · N」入口按钮（N=曲库总数） | 用户 | v1.0.8 | 竖屏/横屏两套布局同步调整；曲库按钮沿用 `back` id（finish 回主界面），总数进入页面时后台查询一次 | `res/layout/activity_player*.xml`、`ui/PlayerActivity` |
 
 ### E. 歌词
 
@@ -76,6 +80,8 @@
 | E1 | 自动联网找歌词并在播放界面逐行同步展示 | 用户 | v1.0.4 | 网易云免加密 GET 接口（cloudsearch 搜索 → song/lyric 取词），LRC 解析 + 播放进度驱动高亮滚动；结果缓存到 `getCacheDir()/lyrics`；面板支持手动搜索更换 | `lyric/NeteaseLyric`、`lyric/Lyric`、`ui/PlayerActivity` |
 | E2 | 歌词搜索栏预填「歌手 歌名」，不含编号与 UP 主名 | 用户 | v1.0.6 | `suggestQuery(title, author)`：去括号标签 → 去 `P1/第N集/BV号/EP/CD/4K` 等编号噪声 → 剥离行首序号 → 「序号歌手 - 歌名」拆分为歌手+歌名组合，去重不重复拼接 | `lyric/NeteaseLyric.suggestQuery` |
 | E3 | 换歌自动刷新歌词搜索词与内容 | 自主 | v1.0.6 | `fetchLyricFor(cur)` 以 `lastLyricKey` 判断换曲自动重查 | `ui/PlayerActivity` |
+| E4 | 搜索结果过滤明显不相关的标题 | 用户 | v1.0.8 | `relevant(query, name)`：标题与查询词字符重合度 ≥50% 才保留（空白忽略、不分大小写） | `lyric/NeteaseLyric.relevant` |
+| E5 | 名称正确但取词失败的候选自动跳过 | 用户 | v1.0.8 | `getLyric` 对过滤后的候选逐个尝试取词（404/空歌词作废），第一个成功的才使用；全部失败才报「无可用歌词」 | `lyric/NeteaseLyric.getLyric` |
 
 ### F. 音量控制
 
@@ -91,6 +97,7 @@
 | G2 | 缓存进度与速度在明显位置展示，并把状态+动作+进度+速度整合进一个按钮 | 用户 | v1.0.2 / v1.0.3 | 「缓存到本地」按钮整合四种状态：去缓存 / 缓存中 NN% · X KB/s（带填充背景）/ 已缓存 ✓ / 失败可重试；`ACT_DL` 广播驱动 | `ui/PlayerActivity`、`util/Downloader` |
 | G3 | 自动缓存下一首（可仅 WiFi） | 用户 | v1.0.0 | 切歌时后台预取下一首；`ConnectivityManager` 判断网络类型 | `util/Downloader` |
 | G4 | 空间管理：缓存占用显示与一键清理 | 用户 | v1.0.0 | 「我的」页实时统计音频/封面目录大小，提供清理入口 | `ui/MainActivity` |
+| G5 | 自动开启缓存：起播即自动缓存当前曲目 | 用户 | v1.0.8 | `openIndex` 时对未缓存曲目自动 `Downloader.start`（内部去重+本地检查）；受「仅WiFi缓存」约束（`Downloader.autoAllowed`），不满足则静默跳过 | `player/PlaybackService.autoCache`、`util/Downloader.autoAllowed` |
 
 ### H. 缺陷修复与工程加固
 
@@ -128,15 +135,21 @@
 | 15 | 曲库按筛选范围批量导入播放 | v1.0.6 | `replaceQueue`（不打断当前曲） |
 | 16 | 迷你条播放事件提醒+标题动画 | v1.0.6 | 状态文案+进度线+过渡动画 |
 | 17 | 曲目列表与播放页「返回 B 站」 | v1.0.7 | `TrackActions.openBili`（bvid+分P → ACTION_VIEW） |
+| 18 | 自动开启缓存 | v1.0.8 | 起播即自动入下载队列（受仅WiFi约束） |
+| 19 | 歌词搜索过滤标题 + 跳过取词失败候选 | v1.0.8 | 字符重合度过滤 + 逐候选重试取词 |
+| 20 | 播放页布局重排（缓存/B站上移、底部三按钮、顶部曲库入口） | v1.0.8 | 竖/横两套布局同步调整 |
+| 21 | 队列清空 + 多选批量删除 | v1.0.8 | 顶栏 ✓/🗑，checkbox 多选，clearQueue/removeIds |
+| 22 | 最近与我的拆分 | v1.0.8 | 四 tab 导航 |
+| 23 | 应用内更新（GitHub 直链） | v1.0.8 | DownloadManager + 安装器拉起 |
 
 ---
 
 ## 四、验证状态
 
 - **全部需求**均已在真机（OPPO N6 Android 16 / Samsung Note8 Android 9）完成功能验证；
-- v1.0.7「返回 B 站」在 Note8 上验证菜单项与跳转（见 release/README.md）；
+- v1.0.7「返回 B 站」在 Note8 上验证菜单项与跳转；v1.0.8 的八项（自动缓存/歌词过滤/布局重排/队列批量操作/四页导航/应用更新）在 Note8 验证，更新链路实测到系统安装器弹出；
 - 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）。
 
 ---
 
-<p align="center"><sub>BMusic requirements · 更新于 v1.0.7</sub></p>
+<p align="center"><sub>BMusic requirements · 更新于 v1.0.8</sub></p>

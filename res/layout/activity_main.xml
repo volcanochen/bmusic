@@ -178,6 +178,49 @@
             </FrameLayout>
         </LinearLayout>
 
+        <!-- ============ page: recent ============ -->
+        <LinearLayout
+            android:id="@+id/page_recent"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:gravity="center_vertical"
+                android:paddingLeft="18dp">
+
+                <TextView
+                    style="@style/TitleText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/tab_recent" />
+            </LinearLayout>
+
+            <ListView
+                android:id="@+id/list_recent"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:divider="@color/divider"
+                android:dividerHeight="0.5dp"
+                android:listSelector="@android:color/transparent" />
+
+            <TextView
+                android:id="@+id/empty_recent"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:padding="20dp"
+                android:text="@string/empty_recent"
+                android:textColor="@color/text_dim"
+                android:textSize="13sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
         <!-- ============ page: me ============ -->
         <ScrollView
             android:id="@+id/page_me"
@@ -203,7 +246,6 @@
                         android:layout_height="wrap_content"
                         android:text="@string/tab_settings" />
                 </LinearLayout>
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -292,35 +334,54 @@
                         android:tint="@color/text_dim" />
                 </LinearLayout>
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="18dp"
-                    android:layout_marginTop="22dp"
-                    android:text="@string/tab_recent"
-                    android:textColor="@color/text"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
-
-                <ListView
-                    android:id="@+id/list_recent"
+                <LinearLayout
+                    android:id="@+id/btn_update"
                     android:layout_width="match_parent"
-                    android:layout_height="240dp"
-                    android:layout_marginTop="6dp"
-                    android:divider="@color/divider"
-                    android:dividerHeight="0.5dp"
-                    android:listSelector="@android:color/transparent" />
+                    android:layout_height="56dp"
+                    android:layout_marginLeft="14dp"
+                    android:layout_marginRight="14dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/shape_card"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingLeft="14dp"
+                    android:paddingRight="14dp">
 
-                <TextView
-                    android:id="@+id/empty_recent"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center"
-                    android:padding="20dp"
-                    android:text="@string/empty_recent"
-                    android:textColor="@color/text_dim"
-                    android:textSize="13sp"
-                    android:visibility="gone" />
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_download"
+                        android:tint="@color/text_sub" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="检查更新 / 下载最新版"
+                            android:textColor="@color/text"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/tv_update"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="更新源：GitHub（始终最新版）"
+                            android:textColor="@color/text_dim"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_next"
+                        android:tint="@color/text_dim" />
+                </LinearLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -476,6 +537,28 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/tab_recent"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/icon_recent"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_history"
+                android:tint="@color/text_dim" />
+
+            <TextView
+                style="@style/TabText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/tab_recent" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/tab_me"
             android:layout_width="0dp"
             android:layout_height="match_parent"
@@ -487,14 +570,14 @@
                 android:id="@+id/icon_me"
                 android:layout_width="22dp"
                 android:layout_height="22dp"
-                android:src="@drawable/ic_history"
+                android:src="@drawable/ic_settings"
                 android:tint="@color/text_dim" />
 
             <TextView
                 style="@style/TabText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/tab_recent" />
+                android:text="@string/tab_settings" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

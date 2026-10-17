@@ -3,6 +3,7 @@ package com.volcano.bmusic.ui;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.DownloadManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ContentResolver;
@@ -12,6 +13,7 @@ import android.content.res.Configuration;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.BroadcastReceiver;
+import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
@@ -37,6 +39,8 @@ import android.widget.PopupWindow;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import android.net.Uri;
 
 import com.volcano.bmusic.App;
 import com.volcano.bmusic.R;
@@ -90,6 +94,7 @@ public class MainActivity extends Activity {
     private String miniError;
     private View pageTracks;
     private View pagePlaylists;
+    private View pageRecent;
     private View pageMe;
     private ImageView[] tabIcons;
     private TextView[] tabTexts;
@@ -193,6 +198,7 @@ public class MainActivity extends Activity {
         tvCache = (TextView) findViewById(R.id.tv_cache);
         pageTracks = findViewById(R.id.page_tracks);
         pagePlaylists = findViewById(R.id.page_playlists);
+        pageRecent = findViewById(R.id.page_recent);
         pageMe = findViewById(R.id.page_me);
         mini = findViewById(R.id.mini);
         miniWrap = findViewById(R.id.mini_wrap);
@@ -209,16 +215,19 @@ public class MainActivity extends Activity {
         int[][] tabs = {
                 {R.id.tab_tracks, R.id.icon_tracks, R.id.page_tracks},
                 {R.id.tab_playlists, R.id.icon_playlists, 0},
+                {R.id.tab_recent, R.id.icon_recent, 0},
                 {R.id.tab_me, R.id.icon_me, 0}
         };
         tabIcons = new ImageView[]{findViewById(R.id.icon_tracks),
-                findViewById(R.id.icon_playlists), findViewById(R.id.icon_me)};
+                findViewById(R.id.icon_playlists), findViewById(R.id.icon_recent),
+                findViewById(R.id.icon_me)};
         final TextView t1 = (TextView) ((ViewGroup) findViewById(R.id.tab_tracks)).getChildAt(1);
         final TextView t2 = (TextView) ((ViewGroup) findViewById(R.id.tab_playlists)).getChildAt(1);
-        final TextView t3 = (TextView) ((ViewGroup) findViewById(R.id.tab_me)).getChildAt(1);
-        tabTexts = new TextView[]{t1, t2, t3};
-        View[] pages = {pageTracks, pagePlaylists, pageMe};
-        for (int i = 0; i < 3; i++) {
+        final TextView t3 = (TextView) ((ViewGroup) findViewById(R.id.tab_recent)).getChildAt(1);
+        final TextView t4 = (TextView) ((ViewGroup) findViewById(R.id.tab_me)).getChildAt(1);
+        tabTexts = new TextView[]{t1, t2, t3, t4};
+        View[] pages = {pageTracks, pagePlaylists, pageRecent, pageMe};
+        for (int i = 0; i < 4; i++) {
             final int idx = i;
             View tab = findViewById(tabs[i][0]);
             tab.setOnClickListener(new View.OnClickListener() {
@@ -233,7 +242,7 @@ public class MainActivity extends Activity {
 
     private void select(int idx) {
         page = idx;
-        View[] pages = {pageTracks, pagePlaylists, pageMe};
+        View[] pages = {pageTracks, pagePlaylists, pageRecent, pageMe};
         for (int i = 0; i < pages.length; i++) {
             pages[i].setVisibility(i == idx ? View.VISIBLE : View.GONE);
             int color = i == idx ? getResources().getColor(R.color.pink)
@@ -241,7 +250,7 @@ public class MainActivity extends Activity {
             tabIcons[i].setColorFilter(color);
             tabTexts[i].setTextColor(color);
         }
-        if (idx == 2) refreshCacheSize();
+        if (idx == 3) refreshCacheSize();
     }
 
     private void initLists() {
@@ -366,6 +375,15 @@ public class MainActivity extends Activity {
                 startActivity(new Intent(MainActivity.this, SettingsActivity.class));
             }
         });
+        View btnUpdate = findViewById(R.id.btn_update);
+        if (btnUpdate != null) {
+            btnUpdate.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startAppUpdate();
+                }
+            });
+        }
         findViewById(R.id.btn_clear_cache).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -947,6 +965,76 @@ public class MainActivity extends Activity {
                 refreshMini();
             }
         }, 400);
+    }
+
+    // ---------------------------------------------------------- app update
+
+    /** GitHub 直链（始终最新版），见 release/README.md。 */
+    private static final String UPDATE_URL =
+            "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk";
+
+    private long updateDlId = -1;
+
+    /** 用系统 DownloadManager 下载最新 APK，完成后拉起安装器。 */
+    private void startAppUpdate() {
+        try {
+            DownloadManager.Request req = new DownloadManager.Request(Uri.parse(UPDATE_URL));
+            req.setTitle("BMusic 更新");
+            req.setDescription("正在下载最新版本…");
+            req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            req.setMimeType("application/vnd.android.package-archive");
+            DownloadManager dm = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+            updateDlId = dm.enqueue(req);
+            Toast.makeText(this, "开始下载最新版本，完成后点击通知安装", Toast.LENGTH_SHORT).show();
+            pollUpdate();
+        } catch (Exception e) {
+            Toast.makeText(this, "下载失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void pollUpdate() {
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (updateDlId == -1 || isFinishing()) return;
+                DownloadManager dm =
+                        (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+                Cursor c = dm.query(new DownloadManager.Query().setFilterById(updateDlId));
+                boolean done = false;
+                if (c != null && c.moveToFirst()) {
+                    int st = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                    if (st == DownloadManager.STATUS_SUCCESSFUL) {
+                        done = true;
+                        Uri uri = dm.getUriForDownloadedFile(updateDlId);
+                        updateDlId = -1;
+                        installApk(uri);
+                    } else if (st == DownloadManager.STATUS_FAILED) {
+                        done = true;
+                        updateDlId = -1;
+                        Toast.makeText(MainActivity.this,
+                                "下载失败，请检查网络后重试", Toast.LENGTH_LONG).show();
+                    }
+                }
+                if (c != null) c.close();
+                if (!done && !isFinishing()) pollUpdate();
+            }
+        }, 1500);
+    }
+
+    private void installApk(Uri uri) {
+        if (uri == null) {
+            Toast.makeText(this, "下载文件不可用", Toast.LENGTH_LONG).show();
+            return;
+        }
+        Intent i = new Intent(Intent.ACTION_VIEW);
+        i.setDataAndType(uri, "application/vnd.android.package-archive");
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            startActivity(i);
+        } catch (Exception e) {
+            Toast.makeText(this,
+                    "请在系统设置里允许 BMusic「安装未知应用」后重试", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void playFrom(List<Track> list, int pos, long pid) {

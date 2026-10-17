@@ -34,6 +34,13 @@ public class QueueActivity extends Activity {
     private TextView nameView;
     private TrackAdapter adapter;
     private ArrayList<Track> data = new ArrayList<Track>();
+    /** 多选模式：非 null 时行点击 = 勾选。 */
+    private java.util.HashSet<String> selected = new java.util.HashSet<String>();
+    private boolean selectMode = false;
+    private View btnSelect;
+    private View btnClear;
+    private View btnDeleteSel;
+    private View btnCancelSel;
 
     private static final String[] ITEMS = {"立即播放", "上移", "下移", "缓存到本地",
             "加入歌单", "返回 B 站", "从队列移除", "删除曲目"};
@@ -45,9 +52,18 @@ public class QueueActivity extends Activity {
         list = (ListView) findViewById(R.id.list);
         empty = (TextView) findViewById(R.id.empty);
         nameView = (TextView) findViewById(R.id.name);
+        btnSelect = findViewById(R.id.btn_select);
+        btnClear = findViewById(R.id.btn_clear);
+        btnDeleteSel = findViewById(R.id.btn_delete_sel);
+        btnCancelSel = findViewById(R.id.btn_cancel_sel);
         adapter = new TrackAdapter(this, new TrackAdapter.Listener() {
             @Override
             public void onPlay(List<Track> l, int pos) {
+                if (selectMode) {
+                    adapter.toggleSelected(l.get(pos).id);
+                    updateSelectionBar();
+                    return;
+                }
                 PlaybackService.open(QueueActivity.this, l.get(pos).id);
             }
 
@@ -63,7 +79,85 @@ public class QueueActivity extends Activity {
                 finish();
             }
         });
+        btnClear.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                confirmClear();
+            }
+        });
+        btnSelect.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setSelectMode(true);
+            }
+        });
+        btnCancelSel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setSelectMode(false);
+            }
+        });
+        btnDeleteSel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                deleteSelected();
+            }
+        });
         load();
+    }
+
+    /** 进入/退出多选模式。 */
+    private void setSelectMode(boolean on) {
+        selectMode = on;
+        selected.clear();
+        adapter.setSelectable(on ? selected : null);
+        btnSelect.setVisibility(on ? View.GONE : View.VISIBLE);
+        btnClear.setVisibility(on ? View.GONE : View.VISIBLE);
+        btnDeleteSel.setVisibility(on ? View.VISIBLE : View.GONE);
+        btnCancelSel.setVisibility(on ? View.VISIBLE : View.GONE);
+        updateSelectionBar();
+    }
+
+    private void updateSelectionBar() {
+        if (selectMode) {
+            nameView.setText("已选 " + selected.size() + " / " + data.size());
+            btnDeleteSel.setEnabled(!selected.isEmpty());
+            btnDeleteSel.setAlpha(selected.isEmpty() ? 0.4f : 1f);
+        } else {
+            nameView.setText(getString(R.string.current_queue)
+                    + "（" + data.size() + "）");
+        }
+    }
+
+    private void deleteSelected() {
+        if (selected.isEmpty()) return;
+        final int n = selected.size();
+        new android.app.AlertDialog.Builder(this)
+                .setMessage("从队列删除选中的 " + n + " 首？")
+                .setPositiveButton("删除", new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface d, int w) {
+                        PlaybackService.removeIds(QueueActivity.this,
+                                new ArrayList<String>(selected));
+                        Toast.makeText(QueueActivity.this,
+                                "已删除 " + n + " 首", Toast.LENGTH_SHORT).show();
+                        setSelectMode(false);
+                    }
+                })
+                .setNegativeButton("取消", null).show();
+    }
+
+    private void confirmClear() {
+        new android.app.AlertDialog.Builder(this)
+                .setMessage("清空整个播放队列（" + data.size() + " 首）？播放将停止。")
+                .setPositiveButton("清空", new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface d, int w) {
+                        PlaybackService.clearQueue(QueueActivity.this);
+                        Toast.makeText(QueueActivity.this, "队列已清空", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("取消", null).show();
     }
 
     private void load() {
@@ -93,8 +187,12 @@ public class QueueActivity extends Activity {
                         data = ts;
                         adapter.setData(ts);
                         empty.setVisibility(ts.isEmpty() ? View.VISIBLE : View.GONE);
-                        nameView.setText(getString(R.string.current_queue)
-                                + "（" + ts.size() + "）");
+                        if (selectMode) {
+                            updateSelectionBar();
+                        } else {
+                            nameView.setText(getString(R.string.current_queue)
+                                    + "（" + ts.size() + "）");
+                        }
                         markPlaying();
                     }
                 });

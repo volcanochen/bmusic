@@ -83,14 +83,30 @@ public final class NeteaseLyric {
             @Override
             public void run() {
                 try {
-                    Song s = searchBest(query);
-                    if (s == null) {
+                    List<Song> cands = searchList(query);
+                    if (cands != null) {
+                        List<Song> keep = new ArrayList<Song>();
+                        for (Song s : cands) {
+                            if (relevant(query, s.name)) keep.add(s);
+                        }
+                        if (!keep.isEmpty()) cands = keep;
+                    }
+                    if (cands == null || cands.isEmpty()) {
                         err(cb, "未找到匹配的歌曲");
                         return;
                     }
-                    String lrc = lyricOf(s.id);
-                    if (lrc == null || lrc.trim().isEmpty()) {
-                        err(cb, "该歌曲暂无歌词");
+                    // Try every filtered candidate until one actually has lyrics —
+                    // some hits 404 / return empty bodies.
+                    String lrc = null;
+                    for (Song s : cands) {
+                        String t = lyricOf(s.id);
+                        if (t != null && !t.trim().isEmpty()) {
+                            lrc = t;
+                            break;
+                        }
+                    }
+                    if (lrc == null) {
+                        err(cb, "搜索结果均无可用歌词");
                         return;
                     }
                     try {
@@ -112,6 +128,13 @@ public final class NeteaseLyric {
             public void run() {
                 try {
                     List<Song> songs = searchList(query);
+                    if (songs != null) {
+                        List<Song> keep = new ArrayList<Song>();
+                        for (Song s : songs) {
+                            if (relevant(query, s.name)) keep.add(s);
+                        }
+                        songs = keep;
+                    }
                     if (songs == null || songs.isEmpty()) {
                         errS(cb, "未找到结果");
                         return;
@@ -122,6 +145,26 @@ public final class NeteaseLyric {
                 }
             }
         }).start();
+    }
+
+    /**
+     * Heuristic: is the search hit's title actually about what we asked for?
+     * Keeps hits whose title shares ≥50% of the query's characters (whitespace
+     * ignored, case-insensitive) — drops obviously unrelated noise like
+     * 「小疼聊音乐」-style uploads matching only one character.
+     */
+    public static boolean relevant(String query, String name) {
+        String q = (query == null ? "" : query.replaceAll("\\s+", "").toLowerCase());
+        String n = (name == null ? "" : name.replaceAll("\\s+", "").toLowerCase());
+        if (q.isEmpty()) return true;
+        if (n.isEmpty()) return false;
+        java.util.Set<Character> inName = new java.util.HashSet<Character>();
+        for (int i = 0; i < n.length(); i++) inName.add(n.charAt(i));
+        int hit = 0;
+        for (int i = 0; i < q.length(); i++) {
+            if (inName.contains(q.charAt(i))) hit++;
+        }
+        return hit * 2 >= q.length();
     }
 
     /** Fetch lyric for a specific Netease song id, cached by cacheKey. */
@@ -227,11 +270,6 @@ public final class NeteaseLyric {
         if (song.contains(singer)) return song;
         if (singer.contains(song)) return singer;
         return singer + " " + song;
-    }
-
-    private static Song searchBest(String query) throws Exception {
-        List<Song> l = searchList(query);
-        return (l != null && !l.isEmpty()) ? l.get(0) : null;
     }
 
     private static List<Song> searchList(String query) throws Exception {

@@ -213,7 +213,7 @@ public class PlayerActivity extends Activity {
         // Tighten the vertical rhythm so the whole column still fits a short window.
         setTopMargin(findViewById(R.id.row_seek), tiny ? 8 : (compact ? 14 : -1));
         setTopMargin(findViewById(R.id.row_ctrl), tiny ? 6 : (compact ? 10 : -1));
-        setTopMargin(findViewById(R.id.row_btns), tiny ? 8 : (compact ? 12 : -1));
+        setTopMargin(findViewById(R.id.row_bottom), tiny ? 8 : (compact ? 12 : -1));
         View root = findViewById(R.id.player_root);   // landscape only
         if (root != null) setPadding(root, tiny ? 6 : (compact ? 10 : 16));
         if (title != null) title.setTextSize(tiny ? 16 : (landLayout ? 19 : 18));
@@ -238,7 +238,7 @@ public class PlayerActivity extends Activity {
         tuneButton(btnQueue, queueIcon, compact, compact);
         tuneButton(btnBili, biliIcon, compact, compact);
         if (compact) return;
-        final View row = findViewById(R.id.row_btns);
+        final View row = findViewById(R.id.row_bottom);
         if (row == null) return;
         row.post(new Runnable() {
             @Override
@@ -389,6 +389,22 @@ public class PlayerActivity extends Activity {
                 onBackPressed();
             }
         });
+        // 曲库入口按钮显示曲库总数：「曲库 · N」
+        final android.widget.Button libBtn = (android.widget.Button) findViewById(R.id.back);
+        if (libBtn != null) {
+            App.postBg(new Runnable() {
+                @Override
+                public void run() {
+                    final int n = Db.get(PlayerActivity.this).allTracks().size();
+                    App.runOnUi(new Runnable() {
+                        @Override
+                        public void run() {
+                            libBtn.setText("曲库 · " + n);
+                        }
+                    });
+                }
+            });
+        }
         findViewById(R.id.btn_queue).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

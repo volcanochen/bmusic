@@ -143,6 +143,14 @@ public class Downloader {
         });
     }
 
+    /**
+     * Whether an automatic (unsupervised) download may start right now:
+     * blocked only when the user restricted caching to WiFi and we are not on WiFi.
+     */
+    public static boolean autoAllowed(Context c) {
+        return !App.wifiOnly() || onWifi(c);
+    }
+
     private static boolean onWifi(Context c) {
         try {
             ConnectivityManager cm = (ConnectivityManager) c.getSystemService(Context.CONNECTIVITY_SERVICE);
