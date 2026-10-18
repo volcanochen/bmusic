@@ -8,10 +8,10 @@
 
 | 目标 | 约束 / 选择 |
 | --- | --- |
-| 无第三方依赖 | 只用 Android Framework + `org.json`，不用 Retrofit / OkHttp / Glide / ExoPlayer |
+| 无第三方依赖 | 只用 Android Framework + `org.json`，不用 Retrofit / OkHttp / Glide / ExoPlayer；仅二维码解码 vendored 了 ZXing 的 QR 子集（50 个文件，Apache 2.0） |
 | 无 Gradle | 直接用 SDK 自带工具链脚本构建，离线可复现 |
-| 极小体积 | APK ≈ 140 KB（对比常规 Gradle + 依赖的 App 动辄数 MB） |
-| 老设备可用 | minSdk 24（Android 7.0），实测 Android 9（三星 Note8）流畅运行 |
+| 极小体积 | APK ≈ 255 KB（对比常规 Gradle + 依赖的 App 动辄数 MB） |
+| 老设备可用 | minSdk 24（Android 7.0），实测 Android 9（三星 Note8）与 Android 16（OPPO N6 近方屏）流畅运行 |
 | 稳定取流 | 实现官方 **wbi 请求签名**，降低接口被拦截的概率 |
 
 选择 `MediaPlayer` 而非 ExoPlayer，是为了**零依赖**——代价是需要自己处理 CDN 的 `Referer` 校验（见 §4.2）。
@@ -22,19 +22,25 @@
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│  UI 层      MainActivity / PlayerActivity /                │
-│             PlaylistActivity / SettingsActivity /          │
-│             ShareActivity  +  TrackAdapter/PlaylistAdapter │
+│  UI 层      MainActivity（5 tab + 内嵌 QueuePage）          │
+│             PlayerActivity / PlaylistActivity /            │
+│             SettingsActivity / ShareActivity /             │
+│             ScanActivity / UpdateActivity / AboutActivity  │
+│             TrackAdapter/PlaylistAdapter  MarqueeView      │
+│             TrackActions（歌曲操作统一入口）                 │
 ├──────────────────────────────────────────────────────────┤
 │  播放层     PlaybackService（前台服务 + MediaSession）      │
-│             MediaButtonReceiver（耳机 / 蓝牙按键）           │
+│             MediaButtonReceiver（耳机 / 蓝牙按键）          │
 ├──────────────────────────────────────────────────────────┤
-│  业务层     Importer（导入编排）  Downloader（缓存下载）      │
+│  业务层     Importer（导入编排）  Downloader（缓存下载）    │
+│             MetaResolver（元信息推断/校准）                 │
 ├──────────────────────────────────────────────────────────┤
-│  B站接口    Bili（解析/取流）  Wbi（签名）                   │
+│  B站接口    Bili（解析/取流）  Wbi（签名）                  │
+│  第三方     QQ 音乐公开搜索（补专辑）  网易云（歌词）        │
 ├──────────────────────────────────────────────────────────┤
-│  网络层     Http（HttpURLConnection 封装 + 重定向跟随）      │
-│  数据层     Db（SQLite）  Cache（文件）  CoverLoader（图片）  │
+│  网络层     Http（HttpURLConnection 封装 + 重定向跟随）     │
+│  数据层     Db（SQLite）  Cache（文件）  CoverLoader（图片）│
+│  扫码       QrDecoder → vendored ZXing QR 子集             │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -48,30 +54,47 @@
 com.volcano.bmusic
 ├── App.java                  全局 Application：线程池、SharedPreferences、广播回调
 ├── model/
-│   ├── Track.java            曲目实体（bvid/cid/page/title/cover/duration/cached/path…）
+│   ├── Track.java            曲目实体（bvid/cid/page/title/song/artist/album/srcTitle/cached…）
 │   └── Playlist.java         歌单实体
 ├── net/
 │   └── Http.java             HttpURLConnection 封装：GET/POST、重定向跟随、下载、公共头
 ├── api/
 │   ├── Wbi.java              wbi 签名（mixin key 混淆表 + MD5）
 │   ├── Bili.java             链接解析 / view 取信息 / playurl 取音频流
-│   └── Importer.java         导入编排：文本 → 解析 → 入库 → 通知界面
+│   └── Importer.java         导入编排：文本 → 解析 → 入库 → 元信息推断 → 通知界面
 ├── db/
 │   └── Db.java               SQLiteOpenHelper + 全部 DAO
 ├── player/
 │   ├── PlaybackService.java  播放引擎（前台服务 / 队列 / 模式 / 通知 / AudioFocus）
 │   └── MediaButtonReceiver.java  媒体按键转发
+├── lyric/
+│   ├── NeteaseLyric.java     网易云免加密接口搜索/取词 + 查询词清洗
+│   └── Lyric.java            LRC 解析
 ├── util/
 │   ├── Cache.java            缓存目录与文件命名
 │   ├── CoverLoader.java      封面：LruCache + 磁盘 + 手写 stack blur
 │   ├── Downloader.java       音频缓存下载 + 进度广播
+│   ├── MetaResolver.java     标题→歌名/歌手/专辑：本地规则即时推断 + QQ 音乐联网补专辑
+│   ├── QrDecoder.java        QR 解码薄壳（灰度 int[] → vendored ZXing）
+│   ├── Backup.java           曲库/歌单/历史 JSON 导出与合并恢复
+│   ├── ApkUpdater.java       应用内更新（version.json 比对 + DownloadManager 下载）
+│   ├── Receivers.java        广播注册统一封装（Android 13+ RECEIVER_NOT_EXPORTED）
+│   ├── Win.java              多窗口/折叠屏窗口度量（WindowMetrics）
 │   └── Notify.java           通知渠道
 └── ui/
-    ├── MainActivity.java     单 Activity 承载曲库 / 歌单 / 我的 三页
-    ├── PlayerActivity.java   播放详情页
+    ├── MainActivity.java     单 Activity 承载 5 tab（含内嵌 QueuePage）
+    ├── QueuePage.java        播放列表页嵌入式控制器（宿主为主界面）
+    ├── PlayerActivity.java   播放详情页（竖/横双布局，按窗口宽高比显式选择）
     ├── PlaylistActivity.java 歌单详情页
     ├── SettingsActivity.java 设置页
     ├── ShareActivity.java    分享 / 链接接收（透明主题对话框）
+    ├── ScanActivity.java     扫码添加（相机逐帧 + 相册识别）
+    ├── UpdateActivity.java   应用更新介绍页
+    ├── AboutActivity.java    关于页
+    ├── TrackActions.java     歌曲操作统一入口（四列表 + 播放页共用）
+    ├── MarqueeView.java      往复跑马灯容器（HorizontalScrollView 方案）
+    ├── VolumeBar.java        纵向音量条（调节+显示一体）
+    ├── WidgetProvider.java   2×2 桌面小组件
     └── adapter/              TrackAdapter / PlaylistAdapter
 ```
 
@@ -199,8 +222,10 @@ private void startTrack(Track t) {
 | `A_PLAY_NOW` | 「立即播放」：不在队列则插入当前曲之后，随即播放 |
 | `A_QUEUE_KEEP` | 替换队列内容但**不打断**正在播放的曲目（曲库批量导入） |
 | `A_QUEUE_EDIT` | 队列编辑：移除 / 上移 / 下移 |
+| `A_APPEND` / `A_APPEND_IDS` | 追加单首 / 批量追加到队列尾部（不打乱当前播放） |
+| `A_QUEUE_CLEAR` / `A_QUEUE_RM_IDS` | 清空队列（并暂停）/ 批量移除指定曲目 |
 
-- **冷启动与服务唤醒**：UI（MainActivity / PlayerActivity / QueueActivity）可能先于服务跑起来
+- **冷启动与服务唤醒**：UI（MainActivity / PlayerActivity / QueuePage）可能先于服务跑起来
   （进程被系统回收或重装后），此时 `PlaybackService.get()` 为 null，界面展示的是
   SharedPreferences 里的持久化状态。三处 UI 在服务缺失时调 `PlaybackService.wake()`
   （无 action 的 `startForegroundService`，`onCreate` 会 `restore()` 出上次的队列），
@@ -225,7 +250,8 @@ Service 通过本地广播与 UI 通信（不依赖 `bindService`）：
 
 ```sql
 tracks(   id TEXT PK, bvid, cid, page, title, author, cover, duration,
-          added, last_played, plays, cached, path, fav )          -- 曲库
+          added, last_played, plays, cached, path, fav,
+          song, artist, album, srcTitle )                         -- 曲库（VER=2 增后四列）
 playlists(id INTEGER PK AUTOINCREMENT, name, created, kind)        -- 歌单(kind=1 为内置)
 pl_tracks(pid, tid, ord, PRIMARY KEY(pid,tid))                     -- 歌单↔曲目，ord 排序
 history(  tid, played )                                            -- 播放历史
@@ -235,6 +261,8 @@ history(  tid, played )                                            -- 播放历�
 - 播放历史只保留最近 **300** 条（`DELETE … WHERE rowid NOT IN (SELECT … LIMIT 300)`）
 - `upsert` 用 `CONFLICT_REPLACE`，重复导入同一 BV 不会产生重复曲目
 - 移除歌单曲目用 `CONFLICT_IGNORE`，天然去重
+- `song / artist / album / srcTitle` 为 v1.0.12 引入的推断元信息列（见 §9），
+  `onUpgrade` 走重建迁移
 
 ### 6.2 主要 DAO
 
@@ -273,9 +301,9 @@ history(  tid, played )                                            -- 播放历�
 
 ## 8. UI 层
 
-### 8.1 单 Activity 承载三页
+### 8.1 单 Activity 承载五页
 
-`MainActivity` 用一个 `FrameLayout` 叠放「曲库 / 歌单 / 我的」三页，底部自绘导航切换 `visibility`。好处是切换无跳转开销、迷你播放条与导航栏常驻。
+`MainActivity` 用一个 `FrameLayout` 叠放「曲库 / 歌单 / 播放列表 / 最近 / 我的」五页，底部自绘导航切换 `visibility`。好处是切换无跳转开销、迷你播放条与导航栏常驻。播放列表页由 `QueuePage` 嵌入式控制器承载（构造时传宿主 Activity，宿主把状态/下载广播分发给它），不再是独立 Activity。
 
 ### 8.2 ⚠️ 一个重要陷阱：列表项点击失效
 
@@ -306,14 +334,30 @@ interface Listener {
 
 这样"点整行播放"和"点按钮弹菜单"互不干扰，也彻底绕开了 `ListView` 子 View 焦点/点击的坑。三处调用方（曲库、最近、歌单详情）统一实现 `onPlay`。
 
-### 8.3 分享接收（`ShareActivity`）
+### 8.3 往复跑马灯（`MarqueeView`）—— 两次踩坑后的最终方案
+
+超长文字不出现「…」而是缓慢往复滚动。第一版（v1.0.17）在 TextView 上自研 scrollX，第二版（v1.0.20）双视图切换，都在三星设备上撞了渲染路径的坑（`canvas.translate` / 程序化 padding 居中会让**整段文字不绘制**；`animator_duration_scale=0` 的设备上 ValueAnimator 瞬间播完）。v1.0.21 重写为开源社区验证过的 **HorizontalScrollView 方案**：
+
+- **结构**：HSV 内包一个 wrap_content 的 TextView（XML 里保留原功能 id，代码零改动）；
+- **短文字**：内容比视口窄 → 子视图 `Gravity.CENTER` 居中（⚠️ 只设 `CENTER_VERTICAL` 水平会靠左，FrameLayout 默认水平 start）；
+- **长文字**：`Handler` + `SystemClock` 按**真实时间**驱动 `HSV.scrollTo`，往复「向左滚出右边 → 停 → 向右滚回左边 → 停」（≈30px/s，启动静置 2.5s、两端停 1.5s）。滚动发生在滚动容器上而非 TextView 内部渲染路径，全机型一致；
+- **滚动终点**：`maxScroll = t.getWidth() - avail`——`TextView.getWidth()` **已含自身 padding**，再叠加会导致到头多滚一段；
+- **文字变化感知**：给子 TextView 加 `TextWatcher`，自动重新评估（布局尺寸变化走 `onLayout(changed)`）；
+- **列表高频 bind**：`runningText` 守卫，同一文字重复绑定不重启动画；
+- **⚠️ 必须重写 `onTouchEvent` 返回 false**：HSV 默认消费整个触摸序列，包在列表行里会**吞掉行点击/长按**、迷你条标题区点击也失效（v1.0.22 修复）。播放页按钮的点击在内层 `clickable=true` 的 TextView 上，不受影响。
+
+使用位置：列表行 title/sub、播放页标题/作者/六个按钮（曲库入口/缓存/返回B站/播放队列/加入歌单/歌词）。
+
+废弃的 `MarqueeTextView`（v1.0.17 自研方案）已删除，其教训保留在需求文档 #51/#53。
+
+### 8.4 分享接收（`ShareActivity`）
 
 - 透明主题 `Theme.Transparent` + `noHistory`，像一个弹出对话框
 - 接收 `ACTION_SEND`（`text/plain`）与 `ACTION_VIEW`（`bilibili.com/video/*`、`b23.tv/*`）
 - 从中提取链接后弹出「立即播放 / 添加到曲库 / 下一首播放」选项
 - `MainActivity` 自身也注册了 `VIEW` 过滤器，从浏览器直接打开链接也能导入
 
-### 8.4 迷你播放条
+### 8.5 迷你播放条
 
 底部常驻，展示当前曲的封面 / 标题 / 作者与播放暂停、下一首按钮；点击进入播放页。刷新由 `ACT_STATE` / `ACT_COVER` 广播驱动。
 
@@ -321,16 +365,19 @@ interface Listener {
 - 标题 / 副标题切换时做淡入淡出 + 位移过渡（`animateText()`），播放键切换有脉冲缩放
 - 「立即播放 / 播放 N 首 / 加入队列」等队列事件都会立刻反映到迷你条上
 
-### 8.5 播放队列页（`QueueActivity`）与歌曲操作（`TrackActions`）
+### 8.6 播放列表页（`QueuePage`）与歌曲操作（`TrackActions`）
 
-- `QueueActivity` 复用曲库的 `item_track` 行布局与 `TrackAdapter`，当前曲目标记 ▶ 并高亮
+- 播放列表不再是独立 Activity：`QueuePage` 作为嵌入式控制器被主界面 `<include>` 进页面栈，
+  复用曲库的 `item_track` 行布局与 `TrackAdapter`，当前曲目标记 ▶ 并高亮
 - 行点击 = 立即播放；`⋮` 弹出操作菜单（立即播放 / 上移 / 下移 / 缓存 / 加入歌单 / 从队列移除 / 删除曲目）
-- 各页面（曲库 / 最近 / 歌单详情 / 队列）的歌曲操作菜单收敛到 `TrackActions`
-  （`playNow / cache / addToPlaylist / confirmDelete`），避免同一逻辑四份实现
+- 各页面（曲库 / 最近 / 歌单详情 / 播放列表）的歌曲操作菜单收敛到 `TrackActions`
+  （`playNow / cache / addToPlaylist / confirmDelete`），避免同一逻辑四份实现；
+  菜单标题用自定义视图 `view_menu_title`（`maxLines=3` + 主题粉加粗 16sp，与动作项用颜色区分）
 - 歌词搜索预填由 `NeteaseLyric.suggestQuery(title, author)` 生成：去掉 `P1 / 第N集 / BV号` 等编号噪声，
   「`<序号><歌手> - <歌名>`」类标题拆成「歌手 歌名」，不含编号与 UP 主名
+- 播放页底部「播放队列」按钮 → `page=2` extra + `CLEAR_TOP|SINGLE_TOP` 复用主界面实例并自动切 tab
 
-### 8.6 分屏 / 浮窗（自由窗口）适配
+### 8.7 分屏 / 浮窗（自由窗口）适配
 
 多窗口下窗口尺寸可随时变化，且**不再等于物理屏幕**，因此布局不能依赖整机方向。
 
@@ -364,7 +411,28 @@ Win.wide(activity)     // 窗口宽 > 高
 
 ---
 
-## 9. 无 Gradle 构建流水线（`build.sh`）
+## 9. 元信息推断（`MetaResolver`）与扫码（`QrDecoder`）
+
+### 9.1 从标题推断「歌名 / 歌手 / 专辑」
+
+B 站音频的原始标题常是「`0095. 路 - 梁静茹`」「`【官方 MV】Never Gonna Give You Up - Rick Astley`」这类形态，需要拆成规范的「歌名 / 歌手 / 专辑」：
+
+- **本地规则即时推断（`parseLocal`）**：剥序号 → 按 UP 主名（`cleanAuthor`）出现在左/右 + 是否带序号，判定「歌名 - 歌手」的左右（合集「序号. 歌名 - 歌手」整条易被颠倒，是踩过的坑）；`《》`内优先作歌名；`A _ B` 多歌手统一为 `A / B`；
+- **联网只补专辑、绝不覆盖歌名/歌手**：调 **QQ 音乐公开搜索**（`c.y.qq.com/soso/fcgi-bin/client_search_cp`，免签名，带 Referer）取真实发行专辑，采纳门控 = 候选歌名高度一致 + 歌手对得上，否则留空显示 `Unknown`。网易云源已弃用（翻唱多、专辑常是合集名）；百度百科有 JS 反爬（PARIS_CHALLENGE），纯 HTTP 抓不到；
+- **存量重推（backfill）**：升级后首次启动对全部存量曲目按新规则重推（`meta_backfill_v5`：先清空旧专辑再重取），节流 400ms、连续 3 次失败即停防限流。
+
+推断结果存 `tracks` 表的 `song / artist / album / srcTitle` 列（§6.1），列表显示与歌词搜索都优先用规范名。
+
+### 9.2 二维码扫码
+
+- **vendored ZXing 3.3.3 core 的 QR 解码子集**（Apache 2.0）：50 个文件只含解码所需类（无 encoder、无其他码制），兼容本项目「无 lambda、javac -source 8」约束；
+- `QrDecoder` 是薄壳，签名不变（灰度 `int[]` → 自定义 `GraySource`），按 **全局直方图 → Hybrid 局部自适应 → 各自反色** 四路尝试，白底黑码/深底白码都能识别；
+- `ScanActivity` 支持摄像头逐帧解码（预览按 letterbox 校正宽高比、解码帧按显示方向 4 向轮试）与相册图片识别；
+- 测试注意：`segno` 生成短文本二维码会自动降级为 Micro QR（ZXing 子集不支持），测试须 `version=2` 强制标准码。
+
+---
+
+## 10. 无 Gradle 构建流水线（`build.sh`）
 
 `aapt2 → javac → d8 → 打 dex → zipalign → apksigner`，七步走：
 
@@ -389,45 +457,51 @@ Win.wide(activity)     // 窗口宽 > 高
 
 ---
 
-## 10. 真机调试记录（Samsung Galaxy Note8 / Android 9）
+## 11. 真机调试记录（Samsung Note8 / Android 9 · OPPO N6 / Android 16）
 
 | 场景 | 做法 |
 | --- | --- |
 | 静音测试 | `adb shell media volume --set 0 --stream 3`，全程音量 0，不扰民 |
-| 定位控件坐标 | `adb shell uiautomator dump` + `adb pull`，再用脚本解析 `bounds` |
-| 截图 | `adb exec-out screencap -p > x.png`（二进制安全） |
+| 定位控件坐标 | **screencap 全尺寸 + PIL 裁剪原比例区域读坐标**（缩略图心算缩放比易错）；⚠️ 有跑马灯动画的页面 `uiautomator dump` 永不满闲直接失败 |
+| 截图 | Note8：`shell screencap -p /sdcard/s.png` + `adb pull`（exec-out 流易截断）；N6：输出带前缀，按 `\x89PNG` 签名切片 |
 | 只看本 App 日志 | 自定义 tag `BMusic`，`adb logcat -s BMusic:V` |
+| 查历史崩溃 | `adb shell dumpsys dropbox --print \| grep -A40 data_app_crash` |
+| USB 频繁掉线 | `adb reconnect offline` 循环恢复；不行就重插（需重新授权） |
 | 模拟分享 | `adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT "<链接>" -n com.volcano.bmusic/.ui.ShareActivity` |
 | 未导出页面 | `SettingsActivity` 等 `exported=false`，`am start` 会被系统拒绝，只能从 App 内导航进入（这是**正确**的安全行为） |
 
-> 截图设备逻辑分辨率为 `720×1480`（density 274），`input tap` 用的是**逻辑坐标**，与截图文件像素可能不同，排查点击问题时要先确认 `wm size / wm density`。
+> 设备分辨率**随时可能漂移**：Note8 物理档 1440×2960（当前工作 override 1080×2220@480dpi），排查点击问题前先 `wm size / wm density` 确认，用完记得还原。`MSYS_NO_PATHCONV=1` 必须在所有 adb shell/pull 之前 export，否则 `/sdcard` 会被 Git Bash 改写。
 
 ---
 
-## 11. 目录结构
+## 12. 目录结构
 
 ```
-bmusic/
+bmusic-clone/
 ├── AndroidManifest.xml
 ├── build.sh                  # 无 Gradle 构建脚本
 ├── README.md                 # 产品说明
 ├── docs/
 │   ├── TECHNICAL.md          # 本文档
+│   ├── requirements/         # 需求全集与实现对照
 │   └── screenshots/          # 真机截图
+├── release/                  # 可直接下载安装的 APK + version.json
 ├── res/                      # 布局 / drawable / 图标 / values
-└── src/com/volcano/bmusic/   # 21 个 Java 文件，约 4800 行
+└── src/
+    ├── com/volcano/bmusic/   # 38 个自研 Java 文件，约 10200 行
+    └── com/google/zxing/     # vendored ZXing QR 解码子集（50 文件，Apache 2.0）
 ```
 
 ---
 
-## 12. 可改进方向
+## 13. 可改进方向
 
 - 用 `SQLite` 之外的持久化播放队列（跨进程恢复更稳）
-- 引入歌词（从 B 站字幕接口或第三方）
-- `MediaSession` 兼容 Android 13 的媒体控制中心（`PlaybackState` 动作位更完整）
+- `MediaSession` 兼容 Android 13+ 的媒体控制中心（`PlaybackState` 动作位更完整）
 - 音质选择 UI（让用户显式指定 192K / 132K / 64K）
 - 后台任务的 WorkManager 化，改善 Android 12+ 的省电约束
+- 二维码扫码换 camera2/CameraX 预览管线（当前仍用已废弃的 Camera API，能跑但非长远之计）
 
 ---
 
-<p align="center"><sub>BMusic 技术文档 · v1.0.6</sub></p>
+<p align="center"><sub>BMusic 技术文档 · v1.0.22</sub></p>

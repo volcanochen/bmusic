@@ -1,4 +1,4 @@
-# BMusic 需求清单与实现对照（v1.0.0 → v1.0.7）
+# BMusic 需求清单与实现对照（v1.0.0 → v1.0.22）
 
 本文档汇总 BMusic 全部需求点，按主题归类。需求来源分两类：
 
@@ -13,14 +13,15 @@
 
 | 分类 | 主题 | 需求条数 | 主要交付版本 |
 | :-- | :-- | --: | :-- |
-| A | 链接获取与导入 | 4 | v1.0.0 |
+| A | 链接获取与导入 | 5 | v1.0.0 / v1.0.9 |
 | B | 播放核心 | 6 | v1.0.0 / v1.0.4 |
-| C | 界面与窗口适配 | 7 | v1.0.0 / v1.0.2 / v1.0.5 |
-| D | 播放队列与曲库操作 | 6 | v1.0.6 / v1.0.7 |
-| E | 歌词 | 3 | v1.0.4 / v1.0.6 |
+| C | 界面与窗口适配 | 9 | v1.0.0 / v1.0.2 / v1.0.5 / v1.0.8 |
+| D | 播放队列与曲库操作 | 8 | v1.0.3 → v1.0.8 |
+| E | 歌词 | 5 | v1.0.4 / v1.0.6 / v1.0.8 |
 | F | 音量控制 | 1 | v1.0.4 |
-| G | 离线缓存 | 4 | v1.0.0 / v1.0.3 |
-| H | 缺陷修复与工程加固 | 8 | 随版本持续 |
+| G | 离线缓存 | 5 | v1.0.0 / v1.0.3 / v1.0.8 |
+| H | 缺陷修复与工程加固 | 15 | 随版本持续 |
+| I | 桌面小组件与扫码等专项 | 4 | v1.0.9 / v1.0.10 / v1.0.16 |
 
 ---
 
@@ -117,13 +118,17 @@
 | H11 | 导入推断的歌名/歌手解析错误（把合集「序号. 歌名 - 歌手」整条颠倒成「歌手=带序号歌名」，且联网校准还会覆盖歌名/歌手导致错配） | 用户 | v1.0.14 | 重写 `MetaResolver.parseLocal`：先 `stripSeq` 剥序号并记 `numbered`，按 UP 主名（`cleanAuthor`）在左/右 + 是否有序号判定「歌名-歌手」左右，`《》`优先，`A _ B` 多歌手统一为 `A / B`；`enrich` 改为**只补专辑**、绝不改歌名/歌手，且须「歌名高度一致 + 歌手对得上」才采纳，否则留空显示 Unknown；`backfill` 升 `meta_backfill_v4`，用标题重推全部存量、再对无专辑曲目节流补专辑（连续 3 次失败即停防限流） |
 | H12 | 专辑校准数据不可信：网易云搜索翻唱太多，专辑字段常是合集名（如「书生尘唱的流行歌」）而非真实专辑 | 用户 | v1.0.15 | 专辑源换成 QQ 音乐公开搜索接口（`c.y.qq.com/soso/fcgi-bin/client_search_cp`，免签名）：返回真实发行专辑（「路」→《丝路》）。门控不变（songMatches + artistMatches）。百科站有 JS 反爬校验（PARIS_CHALLENGE），纯 HTTP 无法访问故不可用；`backfill` 升 v5：清空网易云时代的旧专辑后重新补齐 |
 | H13 | 扫码识别率不足：自研 QR 解码器只支持 v1-10、无透视校正/局部二值化的鲁棒性，真机常扫不出 | 用户 | v1.0.16 | 换 **ZXing 3.3.3 core 的 QR 解码子集**（Apache 2.0，vendored 在 `src/com/google/zxing/`，50 文件仅含解码所需类）：`QrDecoder` 变薄壳保持原签名（灰度 `int[]` → 自定义 `GraySource` → 全局直方图/Hybrid/反色四路尝试）；APK 仅增 33KB（218→251KB，删了 806 行旧解码器） |
+| H14 | 自研跑马灯（scrollX-on-TextView）在三星上把文字搞得完全不绘制：`canvas.translate` / 程序化 padding 两种居中都与 singleLine 渲染路径相互干扰；设备关动画时 `animator_duration_scale=0` 还会把 ValueAnimator 瞬间播完 | 自主 | v1.0.21 | 重写为开源社区验证过的 **HorizontalScrollView 方案**（`ui/MarqueeView`）：HSV 包 wrap_content TextView，短文字 FrameLayout gravity 居中、长文字 Handler+SystemClock 真实时间驱动往复 scrollTo；渲染走滚动容器而非 TextView 内部路径，全机型一致；废弃 `MarqueeTextView` 删除 |
+| H15 | v1.0.21 的 HSV 跑马灯默认消费整个触摸序列，包在列表行里**吞掉行点击/长按**、迷你条标题区点击也失效；另有两处细节：居中只设 `CENTER_VERTICAL` 水平实际靠左、滚动终点重复叠加 padding 导致到头多滚 | 自主 | v1.0.22 | `MarqueeView.onTouchEvent` 返回 false 把触摸还给外层（播放页按钮内层 TextView `clickable=true` 不受影响）；居中改 `Gravity.CENTER`；`maxScroll` 直接用 `t.getWidth()`（已含 padding）；按钮左右留白 8dp→14dp |
 
-### I. 桌面小组件（v1.0.9）
+### I. 桌面小组件与扫码
 
 | ID | 需求 | 来源 | 版本 | 实现方式 |
 | :-- | :-- | :-- | :-- | :-- |
 | W1 | 2×2 桌面小组件，只有一个大号播放/暂停按钮；点按钮以外的空间进入播放页 | 用户 | v1.0.9 | `ui/WidgetProvider`（AppWidgetProvider）：根布局 PendingIntent → PlayerActivity（NEW_TASK|SINGLE_TOP），居中 120dp 粉色圆钮 PendingIntent → 服务 `A_TOGGLE`；`res/xml/widget_play_info.xml`（minWidth/Height 110dp）+ `layout/widget_play.xml` + `drawable/widget_bg|widget_btn` |
 | W2 | 小组件图标实时反映播放状态 | 自主 | v1.0.9 | 服务 `ACT_STATE` 广播（包内显式）加入 WidgetProvider intent-filter，onReceive 里 refreshAll；`onUpdate` 初始渲染按 `PlaybackService.get().isPlaying()` 取图标（服务未运行显示播放键） |
+| W3 | 扫码添加（摄像头扫码 + 相册图片识别，离线） | 用户 | v1.0.9 / v1.0.16 | `ui/ScanActivity` 相机逐帧解码 + `decodeImageUri` 四向旋转重试；v1.0.16 起解码内核换 vendored ZXing（见 H13） |
+| W4 | 折叠屏 / 大屏自适应作为宣传点并补实拍图 | 用户 | v1.0.21 | OPPO N6 近方屏实测：曲库自动重排、播放页自动切「封面左 · 控制右」双栏（`Win.wide()` 选 land 布局）；`docs/screenshots/fold-*.png` 实拍图入 README |
 
 ---
 
@@ -181,9 +186,11 @@
 | 48 | 扫码换 ZXing 成熟解码器 | v1.0.16 | vendored `com.google.zxing` QR 子集（3.3.3，Apache 2.0，50 文件）；`QrDecoder` 薄壳：`GraySource` 适配灰度 `int[]` + Global/Hybrid/反色四路尝试；JVM 可直接单测 |
 | 49 | 列表副标题显示原始信息 + 播放次数淡色徽章 | v1.0.17 | `Track.listSub()` 改为「分P名 · 视频页标题」（单P去重）；播放次数用 `SpannableString`（text_dim 色 + 0.8 倍字号）附在主标题后（`·N次`），不显示则播放数为 0 |
 | 50 | 播放列表选择逻辑复用曲库 + 导航入口 | v1.0.17 | `QueueActivity`：头部垃圾桶改「删除所选」（未勾选置灰禁用），新增选择栏「全选/反选/取消」（复用曲库样式），移除「清空队列」；底部导航在歌单与最近之间插入「播放列表」tab（直接拉起 QueueActivity，歌单图标换心形） |
-| 51 | 显示不下的文字往复滚动而非省略号 | v1.0.17 | 自定义 `ui/MarqueeTextView`（title/sub 替换使用）：Handler+系统时钟按真实时间推进 scrollX，往复「向左滚出右边 → 停 → 向右滚回左边 → 停」（≈30px/s，两端停 1.5s）。不能用 ValueAnimator——设备关动画时 `animator_duration_scale=0` 会瞬间播完；也不能用内置 marquee——只向左循环。注意 `setScrollX` 不触发重绘需手动 `invalidate`，且列表高频重复 bind 同一行时不要重启动画 |
+| 51 | 显示不下的文字往复滚动而非省略号 | v1.0.17 | 自定义 `ui/MarqueeTextView`（title/sub 替换使用）：Handler+系统时钟按真实时间推进 scrollX，往复「向左滚出右边 → 停 → 向右滚回左边 → 停」（≈30px/s，两端停 1.5s）。不能用 ValueAnimator——设备关动画时 `animator_duration_scale=0` 会瞬间播完；也不能用内置 marquee——只向左循环。注意 `setScrollX` 不触发重绘需手动 `invalidate`，且列表高频重复 bind 同一行时不要重启动画。**（该自研方案在三星上有渲染冲突，v1.0.21 起重写为 `MarqueeView` HSV 方案并删除 MarqueeTextView，见 #55 / H14）** |
 | 52 | 播放列表并入主界面（不再独立页面） | v1.0.18 | 新建 `ui/QueuePage` 嵌入式控制器（原 QueueActivity 逻辑整体迁移后删除该 Activity）；`activity_queue.xml` 根布局加 `page_queue` id 由主界面 `<include>` 进页面栈，与曲库同级；底部 5 tab 直接切换（不启 Activity）；播放页「播放队列」按钮 → `page=2` extra + CLEAR_TOP|SINGLE_TOP 复用主界面实例并自动切 tab；广播（ACT_STATE/下载进度）由 MainActivity 统一分发给 QueuePage |
-| 53 | 播放页超长文字不再省略、改为往复滚动 | v1.0.20 | 播放页 title/author 改为「双文本框按文字长度切换」：`FrameLayout` 内普通 `TextView`（wrap_content + 父容器 `center_horizontal` 居中，ellipsize=end 兜底）+ `MarqueeTextView`（match_parent，往复滚动）；`PlayerActivity.selectTitleViews()` 用 `Paint.measureText` 与容器宽度比较后切换可见性，布局/字号/旋转变化后重选。播放页「曲库 · N」按钮换 MarqueeTextView（fitButton 参数放宽为 TextView）。⚠️ 教训：canvas 平移/程序化 padding 居中在三星上与 singleLine 渲染路径相互干扰（文字直接不绘制），双视图+容器居中才是稳妥解；另 MarqueeTextView 构造期 `onTextChanged` 会触发（XML text），字段须先于使用初始化 |
+| 53 | 播放页超长文字不再省略、改为往复滚动 | v1.0.20 | 播放页 title/author 改为「双文本框按文字长度切换」：`FrameLayout` 内普通 `TextView`（wrap_content + 父容器 `center_horizontal` 居中，ellipsize=end 兜底）+ `MarqueeTextView`（match_parent，往复滚动）；`PlayerActivity.selectTitleViews()` 用 `Paint.measureText` 与容器宽度比较后切换可见性，布局/字号/旋转变化后重选。播放页「曲库 · N」按钮换 MarqueeTextView（fitButton 参数放宽为 TextView）。⚠️ 教训：canvas 平移/程序化 padding 居中在三星上与 singleLine 渲染路径相互干扰（文字直接不绘制），双视图+容器居中才是稳妥解；另 MarqueeTextView 构造期 `onTextChanged` 会触发（XML text），字段须先于使用初始化。**（v1.0.21 起播放页滚动统一由 `MarqueeView` 承担，见 #55 / H14）** |
+| 55 | 跑马灯方案重写 + 全按钮滚动 + 菜单标题配色统一 + 折叠屏宣传 | v1.0.21 | ①`ui/MarqueeView` 重写为 HorizontalScrollView 方案（HSV 包 wrap_content TextView：短文字 gravity 居中、长文字 Handler+SystemClock 真实时间驱动往复 scrollTo，启动静置 2.5s+两端停 1.5s；TextWatcher 感知文字变化；列表高频 bind runningText 守卫），适配列表 title/sub 与播放页标题/作者/六按钮，全部不再出现省略号；②三点菜单标题去衬线改主题粉（@color/pink）加粗 16sp（统一字体用颜色区分）；③折叠屏实测入 README（fold-library/fold-player）；④踩坑记录见 H14（HSV 转换丢 layout_width 曾致 N6 InflateException、aapt2 属性去重） |
+| 56 | 播放页按钮文字与边缘留白 + 居中/触摸修正 + README 配图重拍 | v1.0.22 | ①六个跑马灯按钮左右 padding 8dp→14dp（竖/横两布局）；②居中 gravity 补水平方向（只设 CENTER_VERTICAL 水平靠左）；③滚动终点去掉重复叠加的 padding（`getWidth()` 已含）；④`MarqueeView.onTouchEvent` 返回 false，修复 HSV 吞列表行点击/长按与迷你条点击（H15）；⑤README 六张常规截图在 Note8 新分辨率（1080×2220@480dpi）重拍；⑥FAQ 波浪号改全角（GFM 单个 `~` 即删除线定界符）、快速开始补下载与更新 |
 | 54 | 歌曲三点菜单标题栏：最多三行 + 衬线字体与动作区分 | v1.0.20 | `TrackActions.showMenu` 改 `setCustomTitle(view_menu_title)`：TextView `maxLines=3` + `fontFamily=serif` 加粗 16sp，与下方无衬线常规体菜单项明显区分；空标题兜底「未命名曲目」 |
 
 ---
@@ -204,6 +211,7 @@
 - v1.0.17 在 Note8 验证（列表改版+队列复用+导航）：①曲库副标题为「分P名 · 视频页标题」（如「0095. 路 - 梁静茹 · 【Hi-Res无损音乐】梁静茹歌曲音乐合集」）；②播放过的曲目主标题后有淡色小字「·1次」（队列行同步显示）；③队列页点 ✓ 出现「已选 n/N」+ 全选/反选/取消栏，未勾选时垃圾桶置灰，全选后亮起；④底部导航 5 tab（曲库/歌单♥/播放列表/最近/我的），播放列表直达队列页；⑤长副标题跑马灯滚动、无省略号（截图捕捉到滚动中帧）；
 - v1.0.18 在 Note8 验证（播放列表并入主界面）：①底部「播放列表」tab 直接在主界面内切换（不再启动独立 Activity），页面结构与曲库一致（标题行+多选✓+删除垃圾桶置灰）；②播放页底部「播放队列」按钮 → 返回主界面并自动切到播放列表 tab（CLEAR_TOP 复用实例，PlayerActivity 关闭）；③五个 tab（曲库/歌单/播放列表/最近/我的）轮流切换正常，迷你条与 nav 共存正常；无 crash；
 - v1.0.20 在 Note8 验证：①播放页标题「0090. 听不到 - 梁静茹」与作者「上林蜂斗草」均居中显示（双视图选中普通 TextView）；②「曲库 · 95」按钮完整显示；③三点菜单标题「【官方 MV】Never Gonna Give You Up - Rick Astley」衬线加粗自动换行，与菜单动作明显区分；④曲库列表往复滚动正常；⑤调试过程中出现过的 ClassCastException（MarqueeTextView→Button）与「文字不绘制」问题均已在发版前修复；
+- v1.0.21 在 N6 / Note8 验证（跑马灯 HSV 重写）：①列表长标题/副标题往复滚动、无省略号，短文字居中（N6 曲库/播放页截图确认）；②播放页六个按钮超宽也滚动（「缓存到本地」滚动中帧截图）；③N6 近方屏自动切 land 双栏布局，fold-* 实拍图入库；④期间修掉布局转换丢 `layout_width` 的 InflateException（land 布局）与 aapt2 重复属性；Note8 因 USB 反复掉线未能回归（v1.0.22 补验）；
 - v1.0.22 在 Note8 / N6 验证（跑马灯细节修正）：①播放页六个跑马灯按钮文字与药丸边缘留白 14dp、短文字水平垂直居中（修复 gravity 只设垂直导致水平靠左）；②滚动终点距离不再重复叠加 padding（`TextView.getWidth()` 已含 padding），到头不多滚；③MarqueeView 不再消费触摸事件（`onTouchEvent=false`），列表行点击/长按与迷你条标题区点击恢复；④Note8 全链路回归：启动无 crash（此前 Note8 上的 InflateException 崩溃为开发中间版本所致，非发布版）、播放页竖屏布局正常打开、「缓存到本地」超宽按钮滚动中帧截图确认；⑤README 六张常规截图在 Note8 新分辨率（1080×2220@480dpi）全部重拍（曲库/播放页/歌单/歌单详情/通知/设置）；
 - 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）；uiautomator dump 在有跑马灯动画的页面因永不满闲而失败（用 screencap + Read 验证）。
 
