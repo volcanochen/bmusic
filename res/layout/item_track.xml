@@ -49,16 +49,23 @@
                 android:tint="@color/pink"
                 android:visibility="gone" />
 
-            <com.volcano.bmusic.ui.MarqueeTextView
-                android:id="@+id/title"
+            <com.volcano.bmusic.ui.MarqueeView
+                android:id="@+id/title_box"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:ellipsize="none"
-                android:singleLine="true"
-                android:text="标题"
-                android:textColor="@color/text"
-                android:textSize="14sp" />
+                android:layout_weight="1">
+
+                <TextView
+                    android:id="@+id/title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:ellipsize="none"
+                    android:singleLine="true"
+                    android:text="标题"
+                    android:textColor="@color/text"
+                    android:textSize="14sp" />
+            </com.volcano.bmusic.ui.MarqueeView>
         </LinearLayout>
 
         <LinearLayout
@@ -75,17 +82,24 @@
                 android:tint="@color/green"
                 android:visibility="gone" />
 
-            <com.volcano.bmusic.ui.MarqueeTextView
-                android:id="@+id/sub"
+            <com.volcano.bmusic.ui.MarqueeView
+                android:id="@+id/sub_box"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="5dp"
-                android:layout_weight="1"
-                android:ellipsize="none"
-                android:singleLine="true"
-                android:text=""
-                android:textColor="@color/text_dim"
-                android:textSize="11sp" />
+                android:layout_weight="1">
+
+                <TextView
+                    android:id="@+id/sub"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:ellipsize="none"
+                    android:singleLine="true"
+                    android:text=""
+                    android:textColor="@color/text_dim"
+                    android:textSize="11sp" />
+            </com.volcano.bmusic.ui.MarqueeView>
         </LinearLayout>
     </LinearLayout>
 

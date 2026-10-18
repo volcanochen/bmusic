@@ -57,13 +57,6 @@ public class PlayerActivity extends Activity {
     private ImageView bg;
     private TextView title;
     private TextView author;
-    private TextView titleScroll;
-    private TextView authorScroll;
-    private View titleBox;
-    private View authorBox;
-    /** 当前标题/作者文本：布局尺寸变化后用于重选普通/滚动视图。 */
-    private String curTitle = "";
-    private String curAuthor = "";
     private TextView tCur;
     private TextView tDur;
     private SeekBar seek;
@@ -74,9 +67,9 @@ public class PlayerActivity extends Activity {
     private ImageButton btnFav;
     private TextView hint;
     private TextView pageBadge;
-    private Button btnCache;
-    private Button btnQueue;
-    private Button btnBili;
+    private TextView btnCache;
+    private TextView btnQueue;
+    private TextView btnBili;
     // Original leading icons of the action buttons, so they can be restored
     // when the window grows again.
     private Drawable cacheIcon, plIcon, lyricIcon, queueIcon, biliIcon;
@@ -88,7 +81,7 @@ public class PlayerActivity extends Activity {
     private int volMax = 1;
 
     // lyrics
-    private Button btnLyric;
+    private TextView btnLyric;
     private FrameLayout lyricPanel;
     private EditText lyricQuery;
     private Button lyricSearchBtn;
@@ -228,48 +221,11 @@ public class PlayerActivity extends Activity {
         if (root != null) setPadding(root, tiny ? 6 : (compact ? 10 : 16));
         if (title != null) title.setTextSize(tiny ? 16 : (landLayout ? 19 : 18));
         if (author != null) author.setTextSize(tiny ? 11 : 13);
-        if (titleScroll != null) titleScroll.setTextSize(tiny ? 16 : (landLayout ? 19 : 18));
-        if (authorScroll != null) authorScroll.setTextSize(tiny ? 11 : 13);
 
         // 底部状态行已按需求移除：不再显示「已缓存 / 在线播放」等文字
         if (hint != null) hint.setVisibility(View.GONE);
-        // 窗口/字号变了：重新选择普通居中视图还是滚动视图
-        if (titleBox != null) titleBox.post(new Runnable() {
-            @Override
-            public void run() {
-                selectTitleViews();
-            }
-        });
     }
 
-    /**
-     * 按文字实际宽度选择「普通居中 TextView」或「MarqueeTextView」：
-     * 文字显示得下 → 普通视图（由父布局 center_horizontal 居中）；
-     * 显示不下 → 滚动视图（往复跑马灯，不再出现省略号）。
-     */
-    private void selectTitleViews() {
-        if (title == null || titleBox == null || titleBox.getWidth() <= 0) {
-            if (titleBox != null) titleBox.post(new Runnable() {
-                @Override
-                public void run() {
-                    selectTitleViews();
-                }
-            });
-            return;
-        }
-        boolean tFit = curTitle.length() == 0
-                || title.getPaint().measureText(curTitle)
-                <= titleBox.getWidth() - title.getPaddingLeft()
-                - title.getPaddingRight() - 2;
-        title.setVisibility(tFit ? View.VISIBLE : View.GONE);
-        titleScroll.setVisibility(tFit ? View.GONE : View.VISIBLE);
-        boolean aFit = curAuthor.length() == 0
-                || author.getPaint().measureText(curAuthor)
-                <= authorBox.getWidth() - author.getPaddingLeft()
-                - author.getPaddingRight() - 2;
-        author.setVisibility(aFit ? View.VISIBLE : View.GONE);
-        authorScroll.setVisibility(aFit ? View.GONE : View.VISIBLE);
-    }
 
     /**
      * Keep the action labels readable in a cramped window. Icons are never
@@ -279,7 +235,7 @@ public class PlayerActivity extends Activity {
     private void tuneActionButtons(boolean compact) {
         final View addPl = findViewById(R.id.btn_add_pl);
         tuneButton(btnCache, cacheIcon, false, compact);
-        tuneButton((Button) addPl, plIcon, false, compact);
+        tuneButton((TextView) addPl, plIcon, false, compact);
         tuneButton(btnLyric, lyricIcon, false, compact);
         tuneButton(btnQueue, queueIcon, false, compact);
         tuneButton(btnBili, biliIcon, false, compact);
@@ -292,46 +248,16 @@ public class PlayerActivity extends Activity {
                 row.post(new Runnable() {
                     @Override
                     public void run() {
-                        fitButton((TextView) findViewById(R.id.back));
-                        fitButton(btnCache);
-                        fitButton((Button) findViewById(R.id.btn_bili));
-                        fitButton((Button) addPl);
-                        fitButton(btnLyric);
-                        fitButton(btnQueue);
                     }
                 });
             }
         });
     }
 
-    /**
-     * Shrink a button's font (12sp -> 9sp, 0.5sp steps) until the text plus
-     * its leading icon fits the measured button width. Never touches icons.
-     */
-    private void fitButton(TextView b) {
-        if (b == null || b.getWidth() <= 0) return;
-        Drawable[] ds = b.getCompoundDrawables();
-        Drawable d = (ds == null || ds.length == 0) ? null : ds[0];
-        int fixed = (d != null ? d.getIntrinsicWidth() + b.getCompoundDrawablePadding() : 0)
-                + b.getPaddingLeft() + b.getPaddingRight();
-        int avail = b.getWidth() - fixed;
-        if (avail <= 0) return;
-        String t = b.getText().toString();
-        TextPaint tmp = new TextPaint(b.getPaint());
-        float scaled = getResources().getDisplayMetrics().scaledDensity;
-        float chosen = 9f;
-        for (float s = 12f; s >= 9f; s -= 0.5f) {
-            tmp.setTextSize(s * scaled);
-            chosen = s;
-            if (tmp.measureText(t) <= avail) break;
-        }
-        b.setTextSize(chosen); // SP 单位，走 TextView 正规路径触发重新排版
-    }
 
-    private void tuneButton(Button b, Drawable icon, boolean iconless, boolean smallText) {
+    private void tuneButton(TextView b, Drawable icon, boolean iconless, boolean smallText) {
         if (b == null) return;
         b.setSingleLine(true);
-        b.setEllipsize(TextUtils.TruncateAt.END);
         b.setTextSize(smallText ? 11 : 12);
         b.setCompoundDrawables(iconless ? null : icon, null, null, null);
     }
@@ -381,10 +307,6 @@ public class PlayerActivity extends Activity {
         bg = (ImageView) findViewById(R.id.bg);
         title = (TextView) findViewById(R.id.title);
         author = (TextView) findViewById(R.id.author);
-        titleScroll = (TextView) findViewById(R.id.title_scroll);
-        authorScroll = (TextView) findViewById(R.id.author_scroll);
-        titleBox = findViewById(R.id.title_box);
-        authorBox = findViewById(R.id.author_box);
         tCur = (TextView) findViewById(R.id.t_cur);
         tDur = (TextView) findViewById(R.id.t_dur);
         seek = (SeekBar) findViewById(R.id.seek);
@@ -395,12 +317,12 @@ public class PlayerActivity extends Activity {
         btnFav = (ImageButton) findViewById(R.id.btn_fav);
         hint = (TextView) findViewById(R.id.hint);
         pageBadge = (TextView) findViewById(R.id.n_badge);
-        btnCache = (Button) findViewById(R.id.btn_cache);
-        btnQueue = (Button) findViewById(R.id.btn_queue);
-        btnBili = (Button) findViewById(R.id.btn_bili);
+        btnCache = (TextView) findViewById(R.id.btn_cache);
+        btnQueue = (TextView) findViewById(R.id.btn_queue);
+        btnBili = (TextView) findViewById(R.id.btn_bili);
         volBar = (VolumeBar) findViewById(R.id.vol_bar);
         volPct = (TextView) findViewById(R.id.vol_pct);
-        btnLyric = (Button) findViewById(R.id.btn_lyric);
+        btnLyric = (TextView) findViewById(R.id.btn_lyric);
         lyricPanel = (FrameLayout) findViewById(R.id.lyric_panel);
         lyricQuery = (EditText) findViewById(R.id.lyric_query);
         lyricSearchBtn = (Button) findViewById(R.id.lyric_search);
@@ -585,24 +507,14 @@ public class PlayerActivity extends Activity {
                     : getString(R.string.current_queue));
         }
         if (t == null) {
-            curTitle = "未在播放";
-            curAuthor = "";
-            title.setText(curTitle);
-            titleScroll.setText(curTitle);
+            title.setText("未在播放");
             author.setText("");
-            authorScroll.setText("");
-            selectTitleViews();
             hint.setText("从曲库选择一首开始播放");
             btnPlay.setImageResource(R.drawable.ic_play);
             return;
         }
-        curTitle = t.title == null ? "" : t.title;
-        curAuthor = t.author == null ? "" : t.author;
-        title.setText(curTitle);
-        titleScroll.setText(curTitle);
-        author.setText(curAuthor);
-        authorScroll.setText(curAuthor);
-        selectTitleViews();
+        title.setText(t.title);
+        author.setText(t.author == null ? "" : t.author);
         pageBadge.setText("P" + t.page);
         boolean playing = svc != null && svc.isPlaying();
         btnPlay.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play);

@@ -36,7 +36,7 @@ echo "== 2/7 link apk =="
   -o "$OUT/app.apk" \
   --java "$GEN" \
   --min-sdk-version 24 --target-sdk-version 34 \
-  --version-code 21 --version-name "1.0.20" \
+  --version-code 22 --version-name "1.0.21" \
   -A "$ROOT/assets" \
   "${RESZIPS[@]}"
 

@@ -40,12 +40,19 @@ BMusic 是一个**零第三方依赖、不依赖 Gradle** 的原生 Android 音�
 | <img src="docs/screenshots/playlist-detail.png" width="220"/> | <img src="docs/screenshots/notification.png" width="220"/> | <img src="docs/screenshots/settings.png" width="220"/> |
 | 播放全部 / 排序 / 移除 | 上一首 · 暂停 · 下一首 | Cookie / 缓存策略 / 空间管理 |
 
+### 📱 折叠屏 / 大屏自适应（OPPO Find N 系实测）
+
+| 近方屏展开 · 曲库 | 近方屏展开 · 播放页 |
+| :---: | :---: |
+| <img src="docs/screenshots/fold-library.png" width="300"/> | <img src="docs/screenshots/fold-player.png" width="300"/> |
+| 五页标签布局自动重排 | 播放页自动切「封面左 · 控制右」双栏 |
+
 ---
 
 ## ✨ 功能亮点
 
 ### 🎧 像音乐软件一样用 B 站
-- **四种加歌方式**：B 站「分享」面板直达 · 复制链接粘贴 · 扫二维码（摄像头 / 相册识别，ZXing 内核）· 通过"打开方式"分享给 BMusic
+- **加歌方式齐全**：B 站「分享」面板直达 · 复制链接粘贴 · 扫码添加（内置摄像头取景）· 相册识别二维码（ZXing 内核）· 手动输入 BV 号；也支持系统「打开方式」分享给 BMusic
 - **智能识别**：从任意文本提取 `BV 号` / `av 号` / `b23.tv 短链`，自动跟随短链跳转
 - **多 P 精确**：按分 P 取对应音轨，列表直接显示「分P名 · 视频页标题」原始信息，来源一目了然
 - **元信息补全**：从标题解析「歌名 - 歌手」，联网查 **QQ 音乐** 补真实专辑名；对不上宁可显示 Unknown，绝不张冠李戴
@@ -70,6 +77,7 @@ BMusic 是一个**零第三方依赖、不依赖 Gradle** 的原生 Android 音�
 - **空间管理**：实时显示缓存占用，一键清理
 
 ### 🧰 贴心小件
+- **折叠屏 / 大屏自适应**：近方屏、分屏、浮窗、旋转全都不重建 Activity、自动重排布局（OPPO Find N 系真机实测）
 - **桌面 2×2 小组件**：不进 App 直接播放 / 暂停
 - **数据备份 / 恢复**：一键导出曲库、歌单、历史为 JSON
 - **应用内更新**：检查新版本并直接下载安装

@@ -23,6 +23,8 @@ public class MarqueeTextView extends TextView {
     private static final float SPEED_PX_PER_MS = 0.03f;
     /** 两端停顿时长 ms。 */
     private static final long DWELL_MS = 1500L;
+    /** 开始滚动前的静置时长 ms：先让人看清开头，再开始往复。 */
+    private static final long START_DELAY_MS = 2500L;
     /** 刷新间隔 ms。 */
     private static final long FRAME_MS = 16L;
 
@@ -90,7 +92,7 @@ public class MarqueeTextView extends TextView {
 
         maxScroll = (int) (textW - avail) + 1;
         long scrollMs = (long) (maxScroll / SPEED_PX_PER_MS);
-        cycle = scrollMs * 2 + DWELL_MS * 2;
+        cycle = START_DELAY_MS + scrollMs * 2 + DWELL_MS * 2;
         startMs = SystemClock.uptimeMillis();
         runningText = getText();
 
@@ -107,9 +109,13 @@ public class MarqueeTextView extends TextView {
         handler.post(ticker);
     }
 
-    /** 时间→scrollX：向左滚 → 停 → 向右滚 → 停。 */
+    /** 时间→scrollX：静置 → 向左滚 → 停 → 向右滚 → 停。 */
     private int phase(long t) {
-        long scrollMs = (cycle - DWELL_MS * 2) / 2;
+        long scrollMs = (cycle - START_DELAY_MS - DWELL_MS * 2) / 2;
+        if (t < START_DELAY_MS) {
+            return 0;                                   // 开头静置
+        }
+        t -= START_DELAY_MS;
         if (t < scrollMs) {
             return (int) (maxScroll * t / scrollMs);    // 向左滚出右边内容
         }
