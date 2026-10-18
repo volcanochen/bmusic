@@ -11,6 +11,8 @@ import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.TextView;
 
+import com.volcano.bmusic.R;
+
 /**
  * 往复式跑马灯容器（HorizontalScrollView 方案，开源社区验证过的经典做法）：
  * 内部包一个 wrap_content 的 TextView——
@@ -46,6 +48,8 @@ public class MarqueeView extends HorizontalScrollView {
     private long startMs;
     private long cycle;
     private int maxScroll;
+    /** true = 放得下也靠左（列表行）；false = 放得下居中（播放页）。XML alignStart。 */
+    private boolean alignStart;
 
     public MarqueeView(Context c) {
         super(c);
@@ -55,6 +59,9 @@ public class MarqueeView extends HorizontalScrollView {
     public MarqueeView(Context c, AttributeSet a) {
         super(c, a);
         init();
+        android.content.res.TypedArray ta = c.obtainStyledAttributes(a, R.styleable.MarqueeView);
+        alignStart = ta.getBoolean(R.styleable.MarqueeView_alignStart, false);
+        ta.recycle();
     }
 
     public MarqueeView(Context c, AttributeSet a, int s) {
@@ -191,8 +198,8 @@ public class MarqueeView extends HorizontalScrollView {
             return;
         }
         if (content <= avail + 1) {
-            scrollTo(0, 0);                             // 显示得下：gravity 居中即可
-            setChildGravity(true);
+            scrollTo(0, 0);                             // 显示得下：gravity 居中或靠左
+            setChildGravity(!alignStart);
             return;
         }
         setChildGravity(false);                         // 溢出：左对齐，滚出右边内容

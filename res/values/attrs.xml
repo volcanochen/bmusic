@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="MarqueeView">
+        <!-- true = 文字放得下时也靠左对齐（列表行）；false = 居中（播放页） -->
+        <attr name="alignStart" format="boolean" />
+    </declare-styleable>
+</resources>

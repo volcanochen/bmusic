@@ -194,6 +194,8 @@
 | 56 | 播放页按钮文字与边缘留白 + 居中/触摸修正 + README 配图重拍 | v1.0.22 | ①六个跑马灯按钮左右 padding 8dp→14dp（竖/横两布局）；②居中 gravity 补水平方向（只设 CENTER_VERTICAL 水平靠左）；③滚动终点去掉重复叠加的 padding（`getWidth()` 已含）；④`MarqueeView.onTouchEvent` 返回 false，修复 HSV 吞列表行点击/长按与迷你条点击（H15）；⑤README 六张常规截图在 Note8 新分辨率（1080×2220@480dpi）重拍；⑥FAQ 波浪号改全角（GFM 单个 `~` 即删除线定界符）、快速开始补下载与更新 |
 | 57 | 列表标题「有的居中有的左对齐」随机错乱 | 用户 | v1.0.23 | 两个叠加根因（H16）：①行复用时 `startIfNeeded` 在新文字布局完成前执行，`getWidth()` 是回收前旧宽度→短文字误判溢出切左对齐，且 `runningText` 已更新、防重入守卫拦掉重评，错误固化；②XML 内层 TextView `layout_gravity="center_vertical"`（水平默认靠左）与 `childGravityStart=false` 的记忆不符，「放得下→居中」分支被守卫短路从未真正设置，是否居中取决于 View 复用历史。修复：评估前比对 `getLayout().getText()==当前文字`（旧布局残留则延后一轮）；守卫加宽度比较；`setChildGravity` 改为直接对比 LayoutParams 实际 gravity（删除记忆字段）。Note8 实测滚动两屏全部稳定居中、超长正常滚动 |
 | 58 | 按钮里的跑马字要留出位置：不贴边、更不能超出按钮 | 用户 | v1.0.23 | 六个播放页按钮（竖/横两布局）的左右留白从内层文字移到 MarqueeView 自身 padding（12dp）：MarqueeView `clipToPadding=true`（默认）使滚动中的文字在距药丸边缘 12dp 处被裁切，配合 avail/maxScroll 计算已扣除 padding，静止与滚动全程文字都不触碰按钮边缘。Note8 竖屏 + 2220×1080 模拟横屏双验证（横屏窄按钮滚动中帧确认裁切位置） |
+| 59 | 列表歌曲应靠左对齐（居中只适合播放页） | 用户 | v1.0.24 | MarqueeView 新增 `alignStart` 自定义属性（res/values/attrs.xml declare-styleable）：item_track 的 title_box/sub_box 设 `app:alignStart="true"`，放得下也 START 对齐；播放页不设该属性保持居中。坑：ui 包引用 R 需显式 `import com.volcano.bmusic.R`。Note8 验证列表全部靠左、播放页居中无回归 |
+| 60 | 「已缓存 ✓」按钮出现两层药丸（小药丸叠在大药丸里） | 用户 | v1.0.24 | `updateCacheBtn/resetCacheBtn` 的状态背景（ripple_round / 缓存进度填充 makeCacheBg）此前画在内层 TextView 上——TextView wrap_content 比药丸小且居中偏移，形成两层；v1.0.23 把按钮留白移到容器后更明显。修复：背景统一画到外层 MarqueeView 容器（`btnCache.getParent()`），进度填充恢复整颗药丸。Note8 已缓存状态单层确认 |
 | 54 | 歌曲三点菜单标题栏：最多三行 + 衬线字体与动作区分 | v1.0.20 | `TrackActions.showMenu` 改 `setCustomTitle(view_menu_title)`：TextView `maxLines=3` + `fontFamily=serif` 加粗 16sp，与下方无衬线常规体菜单项明显区分；空标题兜底「未命名曲目」 |
 
 ---
@@ -216,6 +218,7 @@
 - v1.0.20 在 Note8 验证：①播放页标题「0090. 听不到 - 梁静茹」与作者「上林蜂斗草」均居中显示（双视图选中普通 TextView）；②「曲库 · 95」按钮完整显示；③三点菜单标题「【官方 MV】Never Gonna Give You Up - Rick Astley」衬线加粗自动换行，与菜单动作明显区分；④曲库列表往复滚动正常；⑤调试过程中出现过的 ClassCastException（MarqueeTextView→Button）与「文字不绘制」问题均已在发版前修复；
 - v1.0.21 在 N6 / Note8 验证（跑马灯 HSV 重写）：①列表长标题/副标题往复滚动、无省略号，短文字居中（N6 曲库/播放页截图确认）；②播放页六个按钮超宽也滚动（「缓存到本地」滚动中帧截图）；③N6 近方屏自动切 land 双栏布局，fold-* 实拍图入库；④期间修掉布局转换丢 `layout_width` 的 InflateException（land 布局）与 aapt2 重复属性；Note8 因 USB 反复掉线未能回归（v1.0.22 补验）；
 - v1.0.22 在 Note8 / N6 验证（跑马灯细节修正）：①播放页六个跑马灯按钮文字与药丸边缘留白 14dp、短文字水平垂直居中（修复 gravity 只设垂直导致水平靠左）；②滚动终点距离不再重复叠加 padding（`TextView.getWidth()` 已含 padding），到头不多滚；③MarqueeView 不再消费触摸事件（`onTouchEvent=false`），列表行点击/长按与迷你条标题区点击恢复；④Note8 全链路回归：启动无 crash（此前 Note8 上的 InflateException 崩溃为开发中间版本所致，非发布版）、播放页竖屏布局正常打开、「缓存到本地」超宽按钮滚动中帧截图确认；⑤README 六张常规截图在 Note8 新分辨率（1080×2220@480dpi）全部重拍（曲库/播放页/歌单/歌单详情/通知/设置）；
+- v1.0.24 在 Note8 验证（列表左对齐 + 缓存按钮双层药丸修复）：曲库列表标题/副标题全部靠左对齐（含带徽章与正在播放行），超长照旧往复滚动；播放页标题/按钮居中无回归；「已缓存 ✓」恢复单层药丸、无内层小药丸；
 - v1.0.23 在 Note8 验证（居中错乱修复 + 按钮跑马字不贴边）：曲库来回滚动多屏后，所有放得下的标题（含带「·N次」徽章的、正在播放粉色的）全部稳定居中；超长标题（如「梁静茹 / 艾怡良 - 飘洋过海来看你」）正确左对齐进入往复滚动；副标题滚动正常；播放页六个按钮留白移至容器 padding（12dp），竖屏与 2220×1080 模拟横屏下滚动中帧均确认文字在距药丸边缘 12dp 处裁切、不贴边不出界；迷你条点击进播放页、播放页标题/按钮居中无回归；
 - 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）；uiautomator dump 在有跑马灯动画的页面因永不满闲而失败（用 screencap + Read 验证）。
 

@@ -1,6 +1,6 @@
 {
-  "versionCode": 24,
-  "versionName": "1.0.23",
-  "notes": "1.修复列表标题居中/左对齐随机错乱（行复用拿旧宽度评估+gravity 初始状态不符导致首次居中被跳过）\n2.播放页按钮跑马字不再贴边/出界：留白移到按钮容器上，滚动文字在距边缘 12dp 处裁切\n3.列表标题现在稳定居中，超长仍自动往复滚动",
+  "versionCode": 25,
+  "versionName": "1.0.24",
+  "notes": "1.列表歌曲标题/副标题靠左对齐（播放页仍居中），更符合列表阅读习惯\n2.修复「已缓存/缓存中」按钮出现两层药丸的问题，缓存进度填充恢复为整颗药丸",
   "url": "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk"
 }

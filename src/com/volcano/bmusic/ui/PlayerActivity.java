@@ -901,29 +901,32 @@ public class PlayerActivity extends Activity {
         updateLyricHighlight();
     }
 
-    /** Update the cache button to reflect download state + progress + speed. */
+    /** Update the cache button to reflect download state + progress + speed.
+     *  背景（药丸/进度填充）画在外层 MarqueeView 容器上——内层 TextView 若自己
+     *  带背景，会出现「药丸里再叠一个小药丸」的两层观感（v1.0.23 用户反馈）。 */
     private void updateCacheBtn(int state, int pct, long speed) {
         if (btnCache == null) return;
+        View box = (View) btnCache.getParent();
         switch (state) {
             case 1: // done / already cached
                 btnCache.setText("已缓存 ✓");
                 btnCache.setTextColor(getResources().getColor(R.color.accent));
-                btnCache.setBackgroundResource(R.drawable.ripple_round);
+                box.setBackgroundResource(R.drawable.ripple_round);
                 break;
             case 2: // failed
                 btnCache.setText("缓存失败 · 点击重试");
                 btnCache.setTextColor(getResources().getColor(R.color.pink));
-                btnCache.setBackgroundResource(R.drawable.ripple_round);
+                box.setBackgroundResource(R.drawable.ripple_round);
                 break;
             case 3: // waiting / preparing
                 btnCache.setText("准备缓存…");
                 btnCache.setTextColor(getResources().getColor(R.color.accent));
-                btnCache.setBackgroundResource(R.drawable.ripple_round);
+                box.setBackgroundResource(R.drawable.ripple_round);
                 break;
             default: // 0 = downloading
                 btnCache.setText("缓存中 " + pct + "%  ·  " + fmtSpeed(speed));
                 btnCache.setTextColor(getResources().getColor(android.R.color.white));
-                btnCache.setBackground(makeCacheBg(pct));
+                box.setBackground(makeCacheBg(pct));
                 break;
         }
     }
@@ -933,7 +936,7 @@ public class PlayerActivity extends Activity {
         if (btnCache == null) return;
         btnCache.setText("缓存到本地");
         btnCache.setTextColor(getResources().getColor(R.color.text_sub));
-        btnCache.setBackgroundResource(R.drawable.ripple_round);
+        ((View) btnCache.getParent()).setBackgroundResource(R.drawable.ripple_round);
     }
 
     /** Rounded progress fill used as the cache button background while downloading. */
