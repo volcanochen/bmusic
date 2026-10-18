@@ -204,8 +204,9 @@
 - v1.0.17 在 Note8 验证（列表改版+队列复用+导航）：①曲库副标题为「分P名 · 视频页标题」（如「0095. 路 - 梁静茹 · 【Hi-Res无损音乐】梁静茹歌曲音乐合集」）；②播放过的曲目主标题后有淡色小字「·1次」（队列行同步显示）；③队列页点 ✓ 出现「已选 n/N」+ 全选/反选/取消栏，未勾选时垃圾桶置灰，全选后亮起；④底部导航 5 tab（曲库/歌单♥/播放列表/最近/我的），播放列表直达队列页；⑤长副标题跑马灯滚动、无省略号（截图捕捉到滚动中帧）；
 - v1.0.18 在 Note8 验证（播放列表并入主界面）：①底部「播放列表」tab 直接在主界面内切换（不再启动独立 Activity），页面结构与曲库一致（标题行+多选✓+删除垃圾桶置灰）；②播放页底部「播放队列」按钮 → 返回主界面并自动切到播放列表 tab（CLEAR_TOP 复用实例，PlayerActivity 关闭）；③五个 tab（曲库/歌单/播放列表/最近/我的）轮流切换正常，迷你条与 nav 共存正常；无 crash；
 - v1.0.20 在 Note8 验证：①播放页标题「0090. 听不到 - 梁静茹」与作者「上林蜂斗草」均居中显示（双视图选中普通 TextView）；②「曲库 · 95」按钮完整显示；③三点菜单标题「【官方 MV】Never Gonna Give You Up - Rick Astley」衬线加粗自动换行，与菜单动作明显区分；④曲库列表往复滚动正常；⑤调试过程中出现过的 ClassCastException（MarqueeTextView→Button）与「文字不绘制」问题均已在发版前修复；
-- 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）。
+- v1.0.22 在 Note8 / N6 验证（跑马灯细节修正）：①播放页六个跑马灯按钮文字与药丸边缘留白 14dp、短文字水平垂直居中（修复 gravity 只设垂直导致水平靠左）；②滚动终点距离不再重复叠加 padding（`TextView.getWidth()` 已含 padding），到头不多滚；③MarqueeView 不再消费触摸事件（`onTouchEvent=false`），列表行点击/长按与迷你条标题区点击恢复；④Note8 全链路回归：启动无 crash（此前 Note8 上的 InflateException 崩溃为开发中间版本所致，非发布版）、播放页竖屏布局正常打开、「缓存到本地」超宽按钮滚动中帧截图确认；⑤README 六张常规截图在 Note8 新分辨率（1080×2220@480dpi）全部重拍（曲库/播放页/歌单/歌单详情/通知/设置）；
+- 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）；uiautomator dump 在有跑马灯动画的页面因永不满闲而失败（用 screencap + Read 验证）。
 
 ---
 
-<p align="center"><sub>BMusic requirements · 更新于 v1.0.20</sub></p>
+<p align="center"><sub>BMusic requirements · 更新于 v1.0.22</sub></p>

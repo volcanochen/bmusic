@@ -6,6 +6,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.TextView;
@@ -123,6 +124,17 @@ public class MarqueeView extends HorizontalScrollView {
     protected void onDetachedFromWindow() {
         stopAnim();
         super.onDetachedFromWindow();
+    }
+
+    /**
+     * 不消费触摸：HorizontalScrollView 默认会吃掉整个触摸序列，
+     * 包在列表行里会让行点击（item click）失效。跑马灯是自动滚动，
+     * 不需要手势，把触摸还给外层（列表行 / 迷你条）。
+     * 播放页按钮的点击在内层 TextView（clickable=true）上，不受影响。
+     */
+    @Override
+    public boolean onTouchEvent(MotionEvent ev) {
+        return false;
     }
 
     /** 列表会高频重复 bind 同一行：文字没变且已在滚动就不打断。 */

@@ -1,6 +1,6 @@
 {
-  "versionCode": 22,
-  "versionName": "1.0.21",
-  "notes": "1.跑马灯彻底重写（HorizontalScrollView 方案）：文字短自动居中、长则往复滚动，全机型渲染一致，修复部分设备上文字不显示/居中失效的问题\n2.播放页所有按钮超宽也改为往复滚动，不再出现省略号\n3.三点菜单标题：统一字体，改用主题粉色区分\n4.新增折叠屏实拍图与宣传点",
+  "versionCode": 23,
+  "versionName": "1.0.22",
+  "notes": "1.播放页按钮文字与边缘留白，短文字正确居中（修复水平未居中与滚动终点过冲）\n2.修复列表行点击可能被滚动容器吞掉的问题\n3.播放页六张截图全部重拍（新分辨率）",
   "url": "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk"
 }

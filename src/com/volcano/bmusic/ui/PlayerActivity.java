@@ -391,7 +391,7 @@ public class PlayerActivity extends Activity {
             }
         });
         // 曲库入口按钮显示曲库总数：「曲库 · N」
-        // 曲库入口按钮显示曲库总数：「曲库 · N」（MarqueeTextView，超宽往复滚动）
+        // 曲库入口按钮显示曲库总数：「曲库 · N」（MarqueeView，超宽往复滚动）
         final android.widget.TextView libBtn = (android.widget.TextView) findViewById(R.id.back);
         if (libBtn != null) {
             App.postBg(new Runnable() {
