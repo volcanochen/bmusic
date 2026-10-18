@@ -1,6 +1,6 @@
 {
-  "versionCode": 19,
-  "versionName": "1.0.18",
-  "notes": "1.播放列表并入主界面：与曲库/歌单一样作为主界面标签页，底部直接切换，不再是独立页面\n2.播放页「播放队列」按钮 → 回主界面并自动停在播放列表页\n3.多选/全选/反选/删除所选、行菜单、播放高亮等行为不变",
+  "versionCode": 21,
+  "versionName": "1.0.20",
+  "notes": "1.播放页标题/作者/按钮超长文字不再出现省略号，改为缓慢左右往复滚动；文字短时自动居中\n2.所有歌曲列表的三点菜单标题栏：最多显示三行，衬线加粗字体与下方动作明显区分\n3.README 全面翻新",
   "url": "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk"
 }

@@ -11,11 +11,11 @@ import android.widget.TextView;
 /**
  * 往复式跑马灯 TextView：文字超宽时先向左滚动显示右边的内容，
  * 到头停顿一会，再向右滚回显示左边的内容，如此往复。
+ * 文字没超宽时不滚动、保持普通 TextView 行为（是否居中交给布局决定）。
  * <p>
  * 内置 marquee 只会向左循环，满足不了「往复」，所以自己驱动 scrollX。
  * 用 Handler + 系统时钟按真实时间推进（不能用 ValueAnimator——
  * 设备关动画时 animator_duration_scale=0 会把动画瞬间播完）。
- * 文字没超宽时不动画；同一文字被高频重复 bind 时不重启。
  */
 public class MarqueeTextView extends TextView {
 
@@ -67,7 +67,7 @@ public class MarqueeTextView extends TextView {
         super.onDetachedFromWindow();
     }
 
-    /** 列表会高频重复 bind 同一行：文字没变就不打断进行中的动画。 */
+    /** 列表会高频重复 bind 同一行：文字没变且已在滚动就不打断。 */
     private void scheduleCheck() {
         if (ticker != null && android.text.TextUtils.equals(runningText, getText())) return;
         stopAnim();
@@ -80,7 +80,7 @@ public class MarqueeTextView extends TextView {
     }
 
     private void startIfNeeded() {
-        if (ticker != null) return;                     // 已在滚动
+        stopAnim();                                     // 每次都重新评估（宽度/文字可能已变）
         if (getWindowVisibility() != VISIBLE || getVisibility() != VISIBLE) return;
         Layout l = getLayout();
         if (l == null || l.getLineCount() == 0) return;
@@ -88,7 +88,7 @@ public class MarqueeTextView extends TextView {
         int avail = getWidth() - getPaddingLeft() - getPaddingRight();
         if (avail <= 0 || textW <= avail + 1) return;   // 显示得下，不用滚
 
-        maxScroll = (int) (textW - avail) + 1;          // 需要滚出的距离
+        maxScroll = (int) (textW - avail) + 1;
         long scrollMs = (long) (maxScroll / SPEED_PX_PER_MS);
         cycle = scrollMs * 2 + DWELL_MS * 2;
         startMs = SystemClock.uptimeMillis();

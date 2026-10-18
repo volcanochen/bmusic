@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.widget.Toast;
 
 import com.volcano.bmusic.App;
+import com.volcano.bmusic.R;
 import com.volcano.bmusic.db.Db;
 import com.volcano.bmusic.model.Playlist;
 import com.volcano.bmusic.model.Track;
@@ -39,10 +40,17 @@ public final class TrackActions {
     private TrackActions() {
     }
 
-    /** Show a track action sheet built from the given item list. */
+    /**
+     * Show a track action sheet built from the given item list.
+     * 标题用自定义视图：最多三行、衬线字体加粗，与下方菜单动作（无衬线常规体）明显区分。
+     */
     public static void showMenu(Activity a, final Track t, String[] items, final ItemHandler h) {
+        android.widget.TextView tv = (android.widget.TextView)
+                android.view.LayoutInflater.from(a)
+                        .inflate(R.layout.view_menu_title, null);
+        tv.setText(t.title == null || t.title.trim().isEmpty() ? "未命名曲目" : t.title);
         new AlertDialog.Builder(a)
-                .setTitle(t.title)
+                .setCustomTitle(tv)
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int which) {

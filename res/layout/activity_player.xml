@@ -31,7 +31,7 @@
             android:gravity="center"
             android:orientation="horizontal">
 
-            <Button
+            <com.volcano.bmusic.ui.MarqueeTextView
                 android:id="@+id/back"
                 android:layout_width="0dp"
                 android:layout_height="36dp"
@@ -40,7 +40,7 @@
                 android:drawableLeft="@drawable/ic_library"
                 android:drawablePadding="6dp"
                 android:drawableTint="@color/text_sub"
-                android:ellipsize="end"
+                android:ellipsize="none"
                 android:gravity="center"
                 android:minWidth="0dp"
                 android:paddingLeft="8dp"
@@ -139,33 +139,69 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
             android:orientation="vertical"
             android:paddingLeft="26dp"
             android:paddingRight="26dp">
 
-            <TextView
-                android:id="@+id/title"
+            <FrameLayout
+                android:id="@+id/title_box"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:gravity="center"
-                android:singleLine="true"
-                android:text="未在播放"
-                android:textColor="@color/text"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:layout_height="wrap_content">
 
-            <TextView
-                android:id="@+id/author"
+                <TextView
+                    android:id="@+id/title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="未在播放"
+                    android:textColor="@color/text"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <com.volcano.bmusic.ui.MarqueeTextView
+                    android:id="@+id/title_scroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="none"
+                    android:singleLine="true"
+                    android:text="未在播放"
+                    android:textColor="@color/text"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/author_box"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:ellipsize="end"
-                android:gravity="center"
-                android:singleLine="true"
-                android:text=""
-                android:textColor="@color/text_sub"
-                android:textSize="13sp" />
+                android:layout_marginTop="6dp">
+
+                <TextView
+                    android:id="@+id/author"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text=""
+                    android:textColor="@color/text_sub"
+                    android:textSize="13sp" />
+
+                <com.volcano.bmusic.ui.MarqueeTextView
+                    android:id="@+id/author_scroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="none"
+                    android:singleLine="true"
+                    android:text=""
+                    android:textColor="@color/text_sub"
+                    android:textSize="13sp"
+                    android:visibility="gone" />
+            </FrameLayout>
 
             <LinearLayout
                 android:id="@+id/row_seek"

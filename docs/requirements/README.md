@@ -183,6 +183,8 @@
 | 50 | 播放列表选择逻辑复用曲库 + 导航入口 | v1.0.17 | `QueueActivity`：头部垃圾桶改「删除所选」（未勾选置灰禁用），新增选择栏「全选/反选/取消」（复用曲库样式），移除「清空队列」；底部导航在歌单与最近之间插入「播放列表」tab（直接拉起 QueueActivity，歌单图标换心形） |
 | 51 | 显示不下的文字往复滚动而非省略号 | v1.0.17 | 自定义 `ui/MarqueeTextView`（title/sub 替换使用）：Handler+系统时钟按真实时间推进 scrollX，往复「向左滚出右边 → 停 → 向右滚回左边 → 停」（≈30px/s，两端停 1.5s）。不能用 ValueAnimator——设备关动画时 `animator_duration_scale=0` 会瞬间播完；也不能用内置 marquee——只向左循环。注意 `setScrollX` 不触发重绘需手动 `invalidate`，且列表高频重复 bind 同一行时不要重启动画 |
 | 52 | 播放列表并入主界面（不再独立页面） | v1.0.18 | 新建 `ui/QueuePage` 嵌入式控制器（原 QueueActivity 逻辑整体迁移后删除该 Activity）；`activity_queue.xml` 根布局加 `page_queue` id 由主界面 `<include>` 进页面栈，与曲库同级；底部 5 tab 直接切换（不启 Activity）；播放页「播放队列」按钮 → `page=2` extra + CLEAR_TOP|SINGLE_TOP 复用主界面实例并自动切 tab；广播（ACT_STATE/下载进度）由 MainActivity 统一分发给 QueuePage |
+| 53 | 播放页超长文字不再省略、改为往复滚动 | v1.0.20 | 播放页 title/author 改为「双文本框按文字长度切换」：`FrameLayout` 内普通 `TextView`（wrap_content + 父容器 `center_horizontal` 居中，ellipsize=end 兜底）+ `MarqueeTextView`（match_parent，往复滚动）；`PlayerActivity.selectTitleViews()` 用 `Paint.measureText` 与容器宽度比较后切换可见性，布局/字号/旋转变化后重选。播放页「曲库 · N」按钮换 MarqueeTextView（fitButton 参数放宽为 TextView）。⚠️ 教训：canvas 平移/程序化 padding 居中在三星上与 singleLine 渲染路径相互干扰（文字直接不绘制），双视图+容器居中才是稳妥解；另 MarqueeTextView 构造期 `onTextChanged` 会触发（XML text），字段须先于使用初始化 |
+| 54 | 歌曲三点菜单标题栏：最多三行 + 衬线字体与动作区分 | v1.0.20 | `TrackActions.showMenu` 改 `setCustomTitle(view_menu_title)`：TextView `maxLines=3` + `fontFamily=serif` 加粗 16sp，与下方无衬线常规体菜单项明显区分；空标题兜底「未命名曲目」 |
 
 ---
 
@@ -201,8 +203,9 @@
 - v1.0.16 在 Note8 验证（扫码换 ZXing）：①JVM 单测 5 张 segno 样张过 4（唯一失败是 Micro QR——B 站二维码均为标准码，不算回归），含 v8 长链接、L/M/Q/H 各纠错级；②真机端到端：相册识别 `/sdcard/Pictures/qrtest1.png`（内容 `BV1GJ411x7h7` 的 v2 标准码）→ 成功解码导入「Never Gonna Give You Up - Rick Astley」，曲库 94→95 首；③APK 218→251KB；
 - v1.0.17 在 Note8 验证（列表改版+队列复用+导航）：①曲库副标题为「分P名 · 视频页标题」（如「0095. 路 - 梁静茹 · 【Hi-Res无损音乐】梁静茹歌曲音乐合集」）；②播放过的曲目主标题后有淡色小字「·1次」（队列行同步显示）；③队列页点 ✓ 出现「已选 n/N」+ 全选/反选/取消栏，未勾选时垃圾桶置灰，全选后亮起；④底部导航 5 tab（曲库/歌单♥/播放列表/最近/我的），播放列表直达队列页；⑤长副标题跑马灯滚动、无省略号（截图捕捉到滚动中帧）；
 - v1.0.18 在 Note8 验证（播放列表并入主界面）：①底部「播放列表」tab 直接在主界面内切换（不再启动独立 Activity），页面结构与曲库一致（标题行+多选✓+删除垃圾桶置灰）；②播放页底部「播放队列」按钮 → 返回主界面并自动切到播放列表 tab（CLEAR_TOP 复用实例，PlayerActivity 关闭）；③五个 tab（曲库/歌单/播放列表/最近/我的）轮流切换正常，迷你条与 nav 共存正常；无 crash；
+- v1.0.20 在 Note8 验证：①播放页标题「0090. 听不到 - 梁静茹」与作者「上林蜂斗草」均居中显示（双视图选中普通 TextView）；②「曲库 · 95」按钮完整显示；③三点菜单标题「【官方 MV】Never Gonna Give You Up - Rick Astley」衬线加粗自动换行，与菜单动作明显区分；④曲库列表往复滚动正常；⑤调试过程中出现过的 ClassCastException（MarqueeTextView→Button）与「文字不绘制」问题均已在发版前修复；
 - 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）。
 
 ---
 
-<p align="center"><sub>BMusic requirements · 更新于 v1.0.18</sub></p>
+<p align="center"><sub>BMusic requirements · 更新于 v1.0.20</sub></p>

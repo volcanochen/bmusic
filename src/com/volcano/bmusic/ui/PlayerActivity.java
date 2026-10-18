@@ -57,6 +57,13 @@ public class PlayerActivity extends Activity {
     private ImageView bg;
     private TextView title;
     private TextView author;
+    private TextView titleScroll;
+    private TextView authorScroll;
+    private View titleBox;
+    private View authorBox;
+    /** 当前标题/作者文本：布局尺寸变化后用于重选普通/滚动视图。 */
+    private String curTitle = "";
+    private String curAuthor = "";
     private TextView tCur;
     private TextView tDur;
     private SeekBar seek;
@@ -221,9 +228,47 @@ public class PlayerActivity extends Activity {
         if (root != null) setPadding(root, tiny ? 6 : (compact ? 10 : 16));
         if (title != null) title.setTextSize(tiny ? 16 : (landLayout ? 19 : 18));
         if (author != null) author.setTextSize(tiny ? 11 : 13);
+        if (titleScroll != null) titleScroll.setTextSize(tiny ? 16 : (landLayout ? 19 : 18));
+        if (authorScroll != null) authorScroll.setTextSize(tiny ? 11 : 13);
 
         // 底部状态行已按需求移除：不再显示「已缓存 / 在线播放」等文字
         if (hint != null) hint.setVisibility(View.GONE);
+        // 窗口/字号变了：重新选择普通居中视图还是滚动视图
+        if (titleBox != null) titleBox.post(new Runnable() {
+            @Override
+            public void run() {
+                selectTitleViews();
+            }
+        });
+    }
+
+    /**
+     * 按文字实际宽度选择「普通居中 TextView」或「MarqueeTextView」：
+     * 文字显示得下 → 普通视图（由父布局 center_horizontal 居中）；
+     * 显示不下 → 滚动视图（往复跑马灯，不再出现省略号）。
+     */
+    private void selectTitleViews() {
+        if (title == null || titleBox == null || titleBox.getWidth() <= 0) {
+            if (titleBox != null) titleBox.post(new Runnable() {
+                @Override
+                public void run() {
+                    selectTitleViews();
+                }
+            });
+            return;
+        }
+        boolean tFit = curTitle.length() == 0
+                || title.getPaint().measureText(curTitle)
+                <= titleBox.getWidth() - title.getPaddingLeft()
+                - title.getPaddingRight() - 2;
+        title.setVisibility(tFit ? View.VISIBLE : View.GONE);
+        titleScroll.setVisibility(tFit ? View.GONE : View.VISIBLE);
+        boolean aFit = curAuthor.length() == 0
+                || author.getPaint().measureText(curAuthor)
+                <= authorBox.getWidth() - author.getPaddingLeft()
+                - author.getPaddingRight() - 2;
+        author.setVisibility(aFit ? View.VISIBLE : View.GONE);
+        authorScroll.setVisibility(aFit ? View.GONE : View.VISIBLE);
     }
 
     /**
@@ -247,7 +292,7 @@ public class PlayerActivity extends Activity {
                 row.post(new Runnable() {
                     @Override
                     public void run() {
-                        fitButton((Button) findViewById(R.id.back));
+                        fitButton((TextView) findViewById(R.id.back));
                         fitButton(btnCache);
                         fitButton((Button) findViewById(R.id.btn_bili));
                         fitButton((Button) addPl);
@@ -263,7 +308,7 @@ public class PlayerActivity extends Activity {
      * Shrink a button's font (12sp -> 9sp, 0.5sp steps) until the text plus
      * its leading icon fits the measured button width. Never touches icons.
      */
-    private void fitButton(Button b) {
+    private void fitButton(TextView b) {
         if (b == null || b.getWidth() <= 0) return;
         Drawable[] ds = b.getCompoundDrawables();
         Drawable d = (ds == null || ds.length == 0) ? null : ds[0];
@@ -336,6 +381,10 @@ public class PlayerActivity extends Activity {
         bg = (ImageView) findViewById(R.id.bg);
         title = (TextView) findViewById(R.id.title);
         author = (TextView) findViewById(R.id.author);
+        titleScroll = (TextView) findViewById(R.id.title_scroll);
+        authorScroll = (TextView) findViewById(R.id.author_scroll);
+        titleBox = findViewById(R.id.title_box);
+        authorBox = findViewById(R.id.author_box);
         tCur = (TextView) findViewById(R.id.t_cur);
         tDur = (TextView) findViewById(R.id.t_dur);
         seek = (SeekBar) findViewById(R.id.seek);
@@ -420,7 +469,8 @@ public class PlayerActivity extends Activity {
             }
         });
         // 曲库入口按钮显示曲库总数：「曲库 · N」
-        final android.widget.Button libBtn = (android.widget.Button) findViewById(R.id.back);
+        // 曲库入口按钮显示曲库总数：「曲库 · N」（MarqueeTextView，超宽往复滚动）
+        final android.widget.TextView libBtn = (android.widget.TextView) findViewById(R.id.back);
         if (libBtn != null) {
             App.postBg(new Runnable() {
                 @Override
@@ -535,14 +585,24 @@ public class PlayerActivity extends Activity {
                     : getString(R.string.current_queue));
         }
         if (t == null) {
-            title.setText("未在播放");
+            curTitle = "未在播放";
+            curAuthor = "";
+            title.setText(curTitle);
+            titleScroll.setText(curTitle);
             author.setText("");
+            authorScroll.setText("");
+            selectTitleViews();
             hint.setText("从曲库选择一首开始播放");
             btnPlay.setImageResource(R.drawable.ic_play);
             return;
         }
-        title.setText(t.title);
-        author.setText(t.author == null ? "" : t.author);
+        curTitle = t.title == null ? "" : t.title;
+        curAuthor = t.author == null ? "" : t.author;
+        title.setText(curTitle);
+        titleScroll.setText(curTitle);
+        author.setText(curAuthor);
+        authorScroll.setText(curAuthor);
+        selectTitleViews();
         pageBadge.setText("P" + t.page);
         boolean playing = svc != null && svc.isPlaying();
         btnPlay.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play);
