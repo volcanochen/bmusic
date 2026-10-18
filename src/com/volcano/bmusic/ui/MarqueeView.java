@@ -41,6 +41,8 @@ public class MarqueeView extends HorizontalScrollView {
     private Runnable ticker;
     /** 动画启动时的文字；同一文字被重复 bind 时不重启。 */
     private CharSequence runningText;
+    /** 启动评估时内层的宽度；宽度变了（旋转/字号/复用换字）也要重评。 */
+    private int runningContent;
     private long startMs;
     private long cycle;
     private int maxScroll;
@@ -137,10 +139,17 @@ public class MarqueeView extends HorizontalScrollView {
         return false;
     }
 
-    /** 列表会高频重复 bind 同一行：文字没变且已在滚动就不打断。 */
+    /**
+     * 列表会高频重复 bind 同一行：文字没变、宽度也没变且已在滚动就不打断。
+     * （宽度必须一起比：布局尺寸变化后旧评估作废，要重新判断居中/滚动。）
+     */
     private void scheduleCheck() {
-        if (ticker != null && android.text.TextUtils.equals(runningText, tv().getText())) {
-            return;
+        if (ticker != null) {
+            TextView t = tv();
+            if (t != null && android.text.TextUtils.equals(runningText, t.getText())
+                    && t.getWidth() == runningContent) {
+                return;
+            }
         }
         stopAnim();
         post(new Runnable() {
@@ -155,6 +164,22 @@ public class MarqueeView extends HorizontalScrollView {
         stopAnim();                                     // 每次都重新评估
         TextView t = tv();
         if (!isShown() || t == null) return;
+        CharSequence cur = t.getText();
+        // ListView 复用行时，本方法可能跑在新文字的布局完成之前——
+        // 此时 t.getLayout() 还是上一条内容的旧布局、getWidth() 是旧宽度，
+        // 拿旧宽度判断会「该居中的误判成溢出（左对齐）/反之」，且误判后
+        // runningText 已更新、防重入守卫会拦掉重评，错误状态固化。
+        // 所以必须等内层用当前文字完成一次布局后再评估。
+        if (t.getLayout() == null
+                || !android.text.TextUtils.equals(t.getLayout().getText(), cur)) {
+            post(new Runnable() {
+                @Override
+                public void run() {
+                    startIfNeeded();
+                }
+            });
+            return;
+        }
         int avail = getWidth() - getPaddingLeft() - getPaddingRight();
         int content = t.getWidth();     // getWidth() 已含自身左右 padding
         if (avail <= 0 || content <= 0) {
@@ -172,6 +197,7 @@ public class MarqueeView extends HorizontalScrollView {
             return;
         }
         setChildGravity(false);                         // 溢出：左对齐，滚出右边内容
+        runningContent = content;
         maxScroll = content - avail + 1;
         long scrollMs = (long) (maxScroll / SPEED_PX_PER_MS);
         cycle = START_DELAY_MS + scrollMs * 2 + DWELL_MS * 2;
