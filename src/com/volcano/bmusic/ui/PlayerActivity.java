@@ -678,9 +678,12 @@ public class PlayerActivity extends Activity {
         });
     }
 
-    /** Open the queue screen (a full list, laid out like the library). */
+    /** Open the queue page inside MainActivity (embedded tab, index 2). */
     private void showQueue() {
-        startActivity(new Intent(PlayerActivity.this, QueueActivity.class));
+        Intent i = new Intent(PlayerActivity.this, MainActivity.class);
+        i.putExtra("page", 2);
+        i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(i);
     }
 
     /* ---------------- volume (vertical bar: display + control) ---------------- */

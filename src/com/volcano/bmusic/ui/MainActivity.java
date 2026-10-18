@@ -105,6 +105,8 @@ public class MainActivity extends Activity {
     private Boolean miniPlaying;
     private String miniError;
     private View pageTracks;
+    private View pageQueue;
+    private QueuePage queuePage;
     private View pagePlaylists;
     private View pageRecent;
     private View pageMe;
@@ -134,6 +136,7 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         setContentView(R.layout.activity_main);
         bind();
+        queuePage = new QueuePage(this);
         initTabs();
         initLists();
         initActions();
@@ -211,11 +214,11 @@ public class MainActivity extends Activity {
                 }
             }, 400);
         }
-        // 播放页「曲库」按钮带回的目标页（0=曲库）
+        // 播放页「曲库/播放列表」按钮带回的目标页（0=曲库 2=播放列表）
         if (i.hasExtra("page")) {
             int p = i.getIntExtra("page", 0);
             if (p < 0) p = 0;
-            if (p > 3) p = 3;
+            if (p > 4) p = 4;
             select(p);
         }
     }
@@ -231,6 +234,7 @@ public class MainActivity extends Activity {
         tvCache = (TextView) findViewById(R.id.tv_cache);
         pageTracks = findViewById(R.id.page_tracks);
         pagePlaylists = findViewById(R.id.page_playlists);
+        pageQueue = findViewById(R.id.page_queue);
         pageRecent = findViewById(R.id.page_recent);
         pageMe = findViewById(R.id.page_me);
         mini = findViewById(R.id.mini);
@@ -281,28 +285,22 @@ public class MainActivity extends Activity {
 
     private void initTabs() {
         int[][] tabs = {
-                {R.id.tab_tracks, R.id.icon_tracks, R.id.page_tracks},
-                {R.id.tab_playlists, R.id.icon_playlists, 0},
-                {R.id.tab_recent, R.id.icon_recent, 0},
-                {R.id.tab_me, R.id.icon_me, 0}
+                {R.id.tab_tracks, R.id.icon_tracks},
+                {R.id.tab_playlists, R.id.icon_playlists},
+                {R.id.tab_queue, R.id.icon_queue},
+                {R.id.tab_recent, R.id.icon_recent},
+                {R.id.tab_me, R.id.icon_me}
         };
         tabIcons = new ImageView[]{findViewById(R.id.icon_tracks),
-                findViewById(R.id.icon_playlists), findViewById(R.id.icon_recent),
-                findViewById(R.id.icon_me)};
-        final TextView t1 = (TextView) ((ViewGroup) findViewById(R.id.tab_tracks)).getChildAt(1);
-        final TextView t2 = (TextView) ((ViewGroup) findViewById(R.id.tab_playlists)).getChildAt(1);
-        final TextView t3 = (TextView) ((ViewGroup) findViewById(R.id.tab_recent)).getChildAt(1);
-        final TextView t4 = (TextView) ((ViewGroup) findViewById(R.id.tab_me)).getChildAt(1);
-        tabTexts = new TextView[]{t1, t2, t3, t4};
-        View[] pages = {pageTracks, pagePlaylists, pageRecent, pageMe};
-        // 播放列表（队列）是独立页面：tab 直接拉起 QueueActivity（歌单与最近之间）
-        findViewById(R.id.tab_queue).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startActivity(new Intent(MainActivity.this, QueueActivity.class));
-            }
-        });
-        for (int i = 0; i < 4; i++) {
+                findViewById(R.id.icon_playlists), findViewById(R.id.icon_queue),
+                findViewById(R.id.icon_recent), findViewById(R.id.icon_me)};
+        tabTexts = new TextView[]{
+                (TextView) ((ViewGroup) findViewById(R.id.tab_tracks)).getChildAt(1),
+                (TextView) ((ViewGroup) findViewById(R.id.tab_playlists)).getChildAt(1),
+                (TextView) ((ViewGroup) findViewById(R.id.tab_queue)).getChildAt(1),
+                (TextView) ((ViewGroup) findViewById(R.id.tab_recent)).getChildAt(1),
+                (TextView) ((ViewGroup) findViewById(R.id.tab_me)).getChildAt(1)};
+        for (int i = 0; i < 5; i++) {
             final int idx = i;
             View tab = findViewById(tabs[i][0]);
             tab.setOnClickListener(new View.OnClickListener() {
@@ -317,7 +315,7 @@ public class MainActivity extends Activity {
 
     private void select(int idx) {
         page = idx;
-        View[] pages = {pageTracks, pagePlaylists, pageRecent, pageMe};
+        View[] pages = {pageTracks, pagePlaylists, pageQueue, pageRecent, pageMe};
         for (int i = 0; i < pages.length; i++) {
             pages[i].setVisibility(i == idx ? View.VISIBLE : View.GONE);
             int color = i == idx ? getResources().getColor(R.color.pink)
@@ -325,7 +323,10 @@ public class MainActivity extends Activity {
             tabIcons[i].setColorFilter(color);
             tabTexts[i].setTextColor(color);
         }
-        if (idx == 3) refreshCacheSize();
+        if (idx == 2) {
+            queuePage.refresh();        // 播放列表页切到前台时拉最新队列
+        }
+        if (idx == 4) refreshCacheSize();
     }
 
     private void initLists() {
@@ -1694,6 +1695,7 @@ public class MainActivity extends Activity {
                 miniError = i.getStringExtra("error");
                 refreshMini();
                 reloadPlaylists();
+                queuePage.onStateChanged();
                 if (miniError != null) {                    Toast.makeText(MainActivity.this, miniError, Toast.LENGTH_LONG).show();
                 }
             } else if (PlaybackService.ACT_PROGRESS.equals(a)) {
@@ -1705,6 +1707,7 @@ public class MainActivity extends Activity {
             } else if (Downloader.ACT_DL.equals(a)) {
                 String id = i.getStringExtra(Downloader.EXTRA_ID);
                 int st = i.getIntExtra(Downloader.EXTRA_STATE, 0);
+                queuePage.onDownload(id, st, i.getIntExtra(Downloader.EXTRA_PROGRESS, 0));
                 if (st == 0) {
                     trackAdapter.setProgress(id, i.getIntExtra(Downloader.EXTRA_PROGRESS, 0));
                 } else if (st == 1) {

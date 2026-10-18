@@ -182,6 +182,7 @@
 | 49 | 列表副标题显示原始信息 + 播放次数淡色徽章 | v1.0.17 | `Track.listSub()` 改为「分P名 · 视频页标题」（单P去重）；播放次数用 `SpannableString`（text_dim 色 + 0.8 倍字号）附在主标题后（`·N次`），不显示则播放数为 0 |
 | 50 | 播放列表选择逻辑复用曲库 + 导航入口 | v1.0.17 | `QueueActivity`：头部垃圾桶改「删除所选」（未勾选置灰禁用），新增选择栏「全选/反选/取消」（复用曲库样式），移除「清空队列」；底部导航在歌单与最近之间插入「播放列表」tab（直接拉起 QueueActivity，歌单图标换心形） |
 | 51 | 显示不下的文字往复滚动而非省略号 | v1.0.17 | 自定义 `ui/MarqueeTextView`（title/sub 替换使用）：Handler+系统时钟按真实时间推进 scrollX，往复「向左滚出右边 → 停 → 向右滚回左边 → 停」（≈30px/s，两端停 1.5s）。不能用 ValueAnimator——设备关动画时 `animator_duration_scale=0` 会瞬间播完；也不能用内置 marquee——只向左循环。注意 `setScrollX` 不触发重绘需手动 `invalidate`，且列表高频重复 bind 同一行时不要重启动画 |
+| 52 | 播放列表并入主界面（不再独立页面） | v1.0.18 | 新建 `ui/QueuePage` 嵌入式控制器（原 QueueActivity 逻辑整体迁移后删除该 Activity）；`activity_queue.xml` 根布局加 `page_queue` id 由主界面 `<include>` 进页面栈，与曲库同级；底部 5 tab 直接切换（不启 Activity）；播放页「播放队列」按钮 → `page=2` extra + CLEAR_TOP|SINGLE_TOP 复用主界面实例并自动切 tab；广播（ACT_STATE/下载进度）由 MainActivity 统一分发给 QueuePage |
 
 ---
 
@@ -199,8 +200,9 @@
 - v1.0.15 在 Note8 验证（专辑源换 QQ 音乐）：`backfill v5` 跑完后曲库专辑列全部为真实发行专辑——「路/丝路」「给从前的爱/燕尾蝶」「纯真/燕尾蝶」「还是好朋友(古巨基/梁静茹)/我还是你的 情歌王」「完整的我/好吗？－太阳如常升起」「天灯/静茹 & 情歌 别再为他流泪」「她/爱久见人心」「生命中不可承受的轻/崇拜」「三时日光/崇拜」等；对比 v1.0.14 网易云时代的「书生尘唱的流行歌」式合集名已消除；无 crash；
 - v1.0.16 在 Note8 验证（扫码换 ZXing）：①JVM 单测 5 张 segno 样张过 4（唯一失败是 Micro QR——B 站二维码均为标准码，不算回归），含 v8 长链接、L/M/Q/H 各纠错级；②真机端到端：相册识别 `/sdcard/Pictures/qrtest1.png`（内容 `BV1GJ411x7h7` 的 v2 标准码）→ 成功解码导入「Never Gonna Give You Up - Rick Astley」，曲库 94→95 首；③APK 218→251KB；
 - v1.0.17 在 Note8 验证（列表改版+队列复用+导航）：①曲库副标题为「分P名 · 视频页标题」（如「0095. 路 - 梁静茹 · 【Hi-Res无损音乐】梁静茹歌曲音乐合集」）；②播放过的曲目主标题后有淡色小字「·1次」（队列行同步显示）；③队列页点 ✓ 出现「已选 n/N」+ 全选/反选/取消栏，未勾选时垃圾桶置灰，全选后亮起；④底部导航 5 tab（曲库/歌单♥/播放列表/最近/我的），播放列表直达队列页；⑤长副标题跑马灯滚动、无省略号（截图捕捉到滚动中帧）；
+- v1.0.18 在 Note8 验证（播放列表并入主界面）：①底部「播放列表」tab 直接在主界面内切换（不再启动独立 Activity），页面结构与曲库一致（标题行+多选✓+删除垃圾桶置灰）；②播放页底部「播放队列」按钮 → 返回主界面并自动切到播放列表 tab（CLEAR_TOP 复用实例，PlayerActivity 关闭）；③五个 tab（曲库/歌单/播放列表/最近/我的）轮流切换正常，迷你条与 nav 共存正常；无 crash；
 - 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）。
 
 ---
 
-<p align="center"><sub>BMusic requirements · 更新于 v1.0.17</sub></p>
+<p align="center"><sub>BMusic requirements · 更新于 v1.0.18</sub></p>

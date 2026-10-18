@@ -321,6 +321,9 @@
             </FrameLayout>
         </LinearLayout>
 
+        <!-- ============ page: queue（播放列表，嵌入页） ============ -->
+        <include layout="@layout/activity_queue" />
+
         <!-- ============ page: recent ============ -->
         <LinearLayout
             android:id="@+id/page_recent"
