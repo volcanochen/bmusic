@@ -4,7 +4,7 @@
 
 ## 当前版本
 
-- **版本号**：v1.0.20（`versionName 1.0.20` / `versionCode 21`）
+- **版本号**：v1.0.21（`versionName 1.0.21` / `versionCode 22`）
 - **包名**：`com.volcano.bmusic`
 - **最低系统**：Android 7.0（API 24）
 - **目标系统**：Android 14（API 34）
