@@ -1,6 +1,6 @@
 {
-  "versionCode": 23,
-  "versionName": "1.0.22",
-  "notes": "1.播放页按钮文字与边缘留白，短文字正确居中（修复水平未居中与滚动终点过冲）\n2.修复列表行点击可能被滚动容器吞掉的问题\n3.播放页六张截图全部重拍（新分辨率）",
+  "versionCode": 24,
+  "versionName": "1.0.23",
+  "notes": "1.修复列表标题居中/左对齐随机错乱（行复用拿旧宽度评估+gravity 初始状态不符导致首次居中被跳过）\n2.播放页按钮跑马字不再贴边/出界：留白移到按钮容器上，滚动文字在距边缘 12dp 处裁切\n3.列表标题现在稳定居中，超长仍自动往复滚动",
   "url": "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk"
 }

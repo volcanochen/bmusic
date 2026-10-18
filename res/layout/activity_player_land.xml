@@ -46,6 +46,8 @@
                 android:layout_weight="1"
                 android:background="@drawable/ripple_round"
                 android:minWidth="0dp"
+                android:paddingLeft="12dp"
+                android:paddingRight="12dp"
                 android:scrollbars="none">
 
                 <TextView
@@ -55,8 +57,6 @@
                     android:drawableTint="@color/text_sub"
                     android:ellipsize="none"
                     android:gravity="center"
-                    android:paddingLeft="14dp"
-                    android:paddingRight="14dp"
                     android:singleLine="true"
                     android:text="曲库"
                     android:textAllCaps="false"
@@ -78,6 +78,8 @@
                 android:layout_weight="1"
                 android:background="@drawable/ripple_round"
                 android:minWidth="0dp"
+                android:paddingLeft="12dp"
+                android:paddingRight="12dp"
                 android:scrollbars="none">
 
                 <TextView
@@ -86,8 +88,6 @@
                     android:drawablePadding="6dp"
                     android:drawableTint="@color/text_sub"
                     android:gravity="center"
-                    android:paddingLeft="14dp"
-                    android:paddingRight="14dp"
                     android:text="缓存到本地"
                     android:textAllCaps="false"
                     android:textColor="@color/text_sub"
@@ -108,6 +108,8 @@
                 android:layout_weight="1"
                 android:background="@drawable/ripple_round"
                 android:minWidth="0dp"
+                android:paddingLeft="12dp"
+                android:paddingRight="12dp"
                 android:scrollbars="none">
 
                 <TextView
@@ -116,8 +118,6 @@
                     android:drawablePadding="6dp"
                     android:drawableTint="@color/text_sub"
                     android:gravity="center"
-                    android:paddingLeft="14dp"
-                    android:paddingRight="14dp"
                     android:text="返回 B 站"
                     android:textAllCaps="false"
                     android:textColor="@color/text_sub"
@@ -325,6 +325,8 @@
                 android:layout_weight="1.5"
                 android:background="@drawable/ripple_round"
                 android:minWidth="0dp"
+                android:paddingLeft="12dp"
+                android:paddingRight="12dp"
                 android:scrollbars="none">
 
                 <TextView
@@ -333,8 +335,6 @@
                     android:drawablePadding="6dp"
                     android:drawableTint="@color/text_sub"
                     android:gravity="center"
-                    android:paddingLeft="14dp"
-                    android:paddingRight="14dp"
                     android:text="@string/current_queue"
                     android:textAllCaps="false"
                     android:textColor="@color/text_sub"
@@ -355,6 +355,8 @@
                 android:layout_weight="1"
                 android:background="@drawable/ripple_round"
                 android:minWidth="0dp"
+                android:paddingLeft="12dp"
+                android:paddingRight="12dp"
                 android:scrollbars="none">
 
                 <TextView
@@ -363,8 +365,6 @@
                     android:drawablePadding="6dp"
                     android:drawableTint="@color/text_sub"
                     android:gravity="center"
-                    android:paddingLeft="14dp"
-                    android:paddingRight="14dp"
                     android:text="加入歌单"
                     android:textAllCaps="false"
                     android:textColor="@color/text_sub"
@@ -385,6 +385,8 @@
                 android:layout_weight="1"
                 android:background="@drawable/ripple_round"
                 android:minWidth="0dp"
+                android:paddingLeft="12dp"
+                android:paddingRight="12dp"
                 android:scrollbars="none">
 
                 <TextView
@@ -393,8 +395,6 @@
                     android:drawablePadding="6dp"
                     android:drawableTint="@color/text_sub"
                     android:gravity="center"
-                    android:paddingLeft="14dp"
-                    android:paddingRight="14dp"
                     android:text="@string/lyrics"
                     android:textAllCaps="false"
                     android:textColor="@color/text_sub"

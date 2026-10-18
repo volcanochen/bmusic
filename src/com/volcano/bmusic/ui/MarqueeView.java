@@ -46,7 +46,6 @@ public class MarqueeView extends HorizontalScrollView {
     private long startMs;
     private long cycle;
     private int maxScroll;
-    private boolean childGravityStart;      // 溢出时子视图改为 start 对齐
 
     public MarqueeView(Context c) {
         super(c);
@@ -235,14 +234,20 @@ public class MarqueeView extends HorizontalScrollView {
         return 0;                                       // 停，展示左边
     }
 
-    /** 溢出滚动时子视图必须 start 对齐（gravity 居中会把内容推出可滚范围）。 */
+    /**
+     * 溢出滚动时子视图必须 start 对齐（gravity 居中会把内容推出可滚范围）。
+     * 直接对比 LayoutParams 的实际 gravity：不依赖记忆字段——
+     * XML 默认 layout_gravity 只有 center_vertical（水平靠左），
+     * 若用「以为的状态」做守卫，初次居中会被误判为已居中而跳过，
+     * 表现为列表里是否居中取决于该 View 的复用历史。
+     */
     private void setChildGravity(boolean center) {
-        if (center == !childGravityStart) return;
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) tv().getLayoutParams();
-        lp.gravity = center ? Gravity.CENTER
+        int want = center ? Gravity.CENTER
                 : (Gravity.START | Gravity.CENTER_VERTICAL);
+        if (lp.gravity == want) return;
+        lp.gravity = want;
         tv().setLayoutParams(lp);
-        childGravityStart = !center;
     }
 
     private void stopAnim() {
