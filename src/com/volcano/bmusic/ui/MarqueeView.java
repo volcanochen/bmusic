@@ -144,7 +144,7 @@ public class MarqueeView extends HorizontalScrollView {
         TextView t = tv();
         if (!isShown() || t == null) return;
         int avail = getWidth() - getPaddingLeft() - getPaddingRight();
-        int content = t.getWidth() + t.getPaddingLeft() + t.getPaddingRight();
+        int content = t.getWidth();     // getWidth() 已含自身左右 padding
         if (avail <= 0 || content <= 0) {
             post(new Runnable() {                       // 内层还没量完，再等一轮
                 @Override
@@ -201,7 +201,7 @@ public class MarqueeView extends HorizontalScrollView {
     private void setChildGravity(boolean center) {
         if (center == !childGravityStart) return;
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) tv().getLayoutParams();
-        lp.gravity = center ? Gravity.CENTER_VERTICAL
+        lp.gravity = center ? Gravity.CENTER
                 : (Gravity.START | Gravity.CENTER_VERTICAL);
         tv().setLayoutParams(lp);
         childGravityStart = !center;
