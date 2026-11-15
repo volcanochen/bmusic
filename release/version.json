@@ -1,6 +1,6 @@
 {
-  "versionCode": 30,
-  "versionName": "1.0.29",
-  "notes": "1.按用户要求回退 v1.0.28 的组件热区改动：恢复 v1.0.26 的三键布局与点击范围（左右热区仅在顶部按钮行，点歌名/空白处进播放页）\n2.桌面组件系统不支持滑动手势，切歌维持点击左右热区方案",
+  "versionCode": 31,
+  "versionName": "1.0.30",
+  "notes": "1.曲库搜索升级为全字段检索：歌名、歌手、专辑、UP主、B站原标题（含合集/专辑名）、BV号/链接全部参与匹配\n2.例：搜「2005」可找到 B 站原标题含「2005年专辑」的全部曲目",
   "url": "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk"
 }

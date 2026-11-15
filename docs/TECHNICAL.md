@@ -651,4 +651,4 @@ BiliFav.importAll()     x/v3/fav/resource/list 分页 → 每个 bvid 走 view �
 
 ---
 
-<p align="center"><sub>BMusic 技术文档 · v1.0.29</sub></p>
+<p align="center"><sub>BMusic 技术文档 · v1.0.30</sub></p>

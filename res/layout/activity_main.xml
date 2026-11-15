@@ -178,7 +178,7 @@
                 android:drawableLeft="@drawable/ic_search"
                 android:drawablePadding="8dp"
                 android:drawableTint="@color/text_dim"
-                android:hint="搜索歌名/歌手/专辑/UP主"
+                android:hint="搜索歌名/歌手/专辑/UP主/原标题"
                 android:imeOptions="actionSearch"
                 android:inputType="text"
                 android:paddingLeft="12dp"

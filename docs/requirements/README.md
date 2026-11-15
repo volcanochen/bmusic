@@ -1,4 +1,4 @@
-# BMusic 需求清单与实现对照（v1.0.0 → v1.0.29）
+# BMusic 需求清单与实现对照（v1.0.0 → v1.0.30）
 
 本文档汇总 BMusic 全部需求点，按主题归类。需求来源分两类：
 
@@ -20,7 +20,7 @@
 | E | 歌词 | 5 | v1.0.4 / v1.0.6 / v1.0.8 |
 | F | 音量控制 | 1 | v1.0.4 |
 | G | 离线缓存 | 5 | v1.0.0 / v1.0.3 / v1.0.8 |
-| H | 缺陷修复与工程加固 | 18 | 随版本持续（v1.0.25 补 -412 风控、v1.0.26 补中断续播） |
+| H | 缺陷修复与工程加固 | 19 | 随版本持续（v1.0.25 补 -412 风控、v1.0.26 补中断续播） |
 | I | 桌面小组件与扫码等专项 | 5 | v1.0.9 / v1.0.10 / v1.0.16 / v1.0.26 |
 | J | B 站账号与收藏夹联动 | 5 | v1.0.25 |
 | K | 曲库去重与数据备份 | 2 | v1.0.27 |
@@ -125,6 +125,7 @@
 | H16 | 列表标题「有的居中有的左对齐」逐行交替：①行复用时 `startIfNeeded` 跑在新文字布局前，拿回收前旧宽度误判居中/溢出，且防重入守卫（文字相同即跳过）把错误固化；②XML 内层 `layout_gravity="center_vertical"` 水平默认靠左，与 `childGravityStart=false` 的记忆不符，「放得下→居中」被守卫短路从未执行 | 用户 | v1.0.23 | ①评估前比对 `t.getLayout().getText()` 与当前文字，不一致（旧布局残留）延后一轮再评——**判断「布局是否已反映当前文字」必须锚定布局内容而非时序**；②防重入守卫加宽度比较（`t.getWidth()==runningContent`）；③`setChildGravity` 改为直接对比 LayoutParams 实际 gravity，删除 `childGravityStart` 记忆字段 |
 | H17 | 播放/缓存报「请求被拦截(-412)」，错误文本还重复两遍 | 用户 | v1.0.25 | 旧 `Bili.call()` 签名失败后又发一次**无签名**请求且以它的错误为准，Referer 还固定首页、设备指纹只有孤立的 `buvid3`。改为持久化成对 buvid3/buvid4 + `b_nut/buvid_fp/_uuid` + `bili_ticket`、完整浏览器头 + 视频页 Referer、统一 WBI 签名；`-412/-352` 自动刷新会话退避重试；`wbi/playurl → playurl → durl` 三级降级 + `backup_url` 换 CDN；错误提示引导扫码登录 |
 | H18 | 切到其他视频 / App 中断后，回来播放续不上 | 用户 | v1.0.26 | 根因：所有 `AUDIOFOCUS_LOSS*` 都调 `pause()` 而它会 `abandonAudioFocus()`，放弃注册后系统不再回调 `GAIN`，且 GAIN 分支为空。改为拆分 `pause()` / `pauseForFocus()` → `pauseInternal(userInitiated)`：被动中断保留焦点注册并记 `resumeOnFocusGain`，GAIN 时自动 `play()` 断点续播；`CAN_DUCK` 降音量；API 26+ `AudioFocusRequest` + `setAcceptsDelayedFocusGain(true)`，焦点被占时挂起 `pendingFocusAction` 等 GAIN；每 5s 落盘 `last_pos/last_pos_id`，服务重建后 `restore()`→`pendingSeek`→`onPrepared.seekTo`；两个 Activity 的 `onResume` 用 `A_RESUME` 兜底（用户主动暂停过或服务未启动都不自动出声） |
+| H19 | 曲库搜索只匹配部分字段，希望检索歌曲所有信息的文本 | 用户 | v1.0.30 | `MainActivity.reloadTracks()` 检索串在原 `title/song/artist/album/author/bvid` 基础上加入 `srcTitle`（B 站原标题，含合集 / 专辑名）与 `id`，全部小写化后 `contains` 匹配；搜索框提示改为「搜索歌名/歌手/专辑/UP主/原标题」；与歌手 / 专辑筛选叠加生效 |
 
 ### I. 桌面小组件与扫码
 
@@ -224,7 +225,7 @@
 | 62 | 切到其他视频中断后能续回来播放 | v1.0.26 | 被动中断保留音频焦点注册 + GAIN 自动续播 + `last_pos` 断点持久化 + `onResume` 兜底 |
 | 63 | 曲库里导入的和单独添加的，链接一样的重复项要去重 | v1.0.27 | `TrackKey` 规范链接 + `tracks.link` 唯一索引 + 三个入库入口 `findByLink` 跳过 + `Db.dedup()` 合并历史重复行并迁移歌单/历史引用 + 「我的」页手动去重入口 |
 | 64 | 备份按曲库歌曲来备份，不记录从哪来的 | v1.0.27 | `Backup.export` 输出当前曲库快照（去重、无来源字段），`restore` 按链接合并并用 `idMap` 修正旧 id 引用，还原完整元信息 |
-| 54 | 歌曲三点菜单标题栏：最多三行 + 衬线字体与动作区分 | v1.0.20 | `TrackActions.showMenu` 改 `setCustomTitle(view_menu_title)`：TextView `maxLines=3` + `fontFamily=serif` 加粗 16sp，与下方无衬线常规体菜单项明显区分；空标题兜底「未命名曲目」 |
+| 65 | 曲库搜索覆盖歌曲所有信息文本 | v1.0.30 | 检索串补入 `srcTitle` 与 `id`，全字段 contains 匹配，与歌手/专辑筛选叠加 || 54 | 歌曲三点菜单标题栏：最多三行 + 衬线字体与动作区分 | v1.0.20 | `TrackActions.showMenu` 改 `setCustomTitle(view_menu_title)`：TextView `maxLines=3` + `fontFamily=serif` 加粗 16sp，与下方无衬线常规体菜单项明显区分；空标题兜底「未命名曲目」 |
 
 ---
 
@@ -257,8 +258,9 @@
 - v1.0.27 在 Note8（SM-N9500 / Android 9，旧版 v1.0.25、真实曲库 95 首）端到端验证合并逻辑：先用旧版恢复注入 2 条同链接重复行（95→97，列表出现 3 份同链接），再覆盖安装 v1.0.27 → 升级时 `dedupIn` 真实合并 2 行（97→95），重复行消失，原曲目缓存角标与播放次数保留；升级后导出备份 95 首、id 集合与升级前完全一致、无悬空引用；
 - v1.0.27 构建与静态验证：①`TrackKey` JVM 单测 10 例全过；②`bash build.sh` 全流程通过，APK 292589 B ≈ 286 KB，版本号 v1.0.27 / versionCode 28；③`javap` 确认 `Db.better(Track,Track,String)` / `findByLink` / `dedupIn` / `toValues` 已编入 dex；④`build.sh` 末尾新增 `cp` 同步 `release/bmusic.apk`，避免再出现「构建产物已更新但发布包还是旧版」；
 - v1.0.29 回退验证（S22U）：恢复 v1.0.26 三键布局后，点组件顶部左键切歌（「小聪明」→「醒不来」，媒体通知 07→08 同步）、点歌名行左侧打开播放页（`PlayerActivity`），即热区恢复为仅顶部按钮行；
+- v1.0.30 搜索验证（S22U，曲库 91 首）：搜「2005」（仅出现在 B 站原标题「陶喆2005年专辑《太平盛世》全碟欣赏」）命中 13 首，列表副标题均含该字样，按钮显示「播放 13 首」；
 - 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）；uiautomator dump 在有跑马灯动画或二维码轮询的页面因永不满闲而失败（用 screencap + 像素定位验证）。
 
 ---
 
-<p align="center"><sub>BMusic requirements · 更新于 v1.0.29</sub></p>
+<p align="center"><sub>BMusic requirements · 更新于 v1.0.30</sub></p>

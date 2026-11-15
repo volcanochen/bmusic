@@ -736,12 +736,15 @@ public class MainActivity extends Activity {
                     String f = filter.toLowerCase();
                     ArrayList<Track> keep = new ArrayList<Track>();
                     for (Track t : all) {
+                        // 全字段检索：歌曲所有文本信息（标题/歌名/歌手/专辑/UP主/
+                        // B站原标题/链接）都参与匹配
                         String s = (t.title == null ? "" : t.title.toLowerCase())
                                 + " " + (t.song == null ? "" : t.song.toLowerCase())
                                 + " " + (t.artist == null ? "" : t.artist.toLowerCase())
                                 + " " + (t.album == null ? "" : t.album.toLowerCase())
                                 + " " + (t.author == null ? "" : t.author.toLowerCase())
-                                + " " + t.bvid;
+                                + " " + (t.srcTitle == null ? "" : t.srcTitle.toLowerCase())
+                                + " " + (t.bvid == null ? t.id : t.bvid + " " + t.id);
                         if (s.contains(f)) keep.add(t);
                     }
                     all.clear();
