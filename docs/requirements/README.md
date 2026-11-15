@@ -1,4 +1,4 @@
-# BMusic 需求清单与实现对照（v1.0.0 → v1.0.30）
+# BMusic 需求清单与实现对照（v1.0.0 → v1.0.31）
 
 本文档汇总 BMusic 全部需求点，按主题归类。需求来源分两类：
 
@@ -225,7 +225,8 @@
 | 62 | 切到其他视频中断后能续回来播放 | v1.0.26 | 被动中断保留音频焦点注册 + GAIN 自动续播 + `last_pos` 断点持久化 + `onResume` 兜底 |
 | 63 | 曲库里导入的和单独添加的，链接一样的重复项要去重 | v1.0.27 | `TrackKey` 规范链接 + `tracks.link` 唯一索引 + 三个入库入口 `findByLink` 跳过 + `Db.dedup()` 合并历史重复行并迁移歌单/历史引用 + 「我的」页手动去重入口 |
 | 64 | 备份按曲库歌曲来备份，不记录从哪来的 | v1.0.27 | `Backup.export` 输出当前曲库快照（去重、无来源字段），`restore` 按链接合并并用 `idMap` 修正旧 id 引用，还原完整元信息 |
-| 65 | 曲库搜索覆盖歌曲所有信息文本 | v1.0.30 | 检索串补入 `srcTitle` 与 `id`，全字段 contains 匹配，与歌手/专辑筛选叠加 || 54 | 歌曲三点菜单标题栏：最多三行 + 衬线字体与动作区分 | v1.0.20 | `TrackActions.showMenu` 改 `setCustomTitle(view_menu_title)`：TextView `maxLines=3` + `fontFamily=serif` 加粗 16sp，与下方无衬线常规体菜单项明显区分；空标题兜底「未命名曲目」 |
+| 65 | 曲库搜索覆盖歌曲所有信息文本 | v1.0.30 | 检索串补入 `srcTitle` 与 `id`，全字段 contains 匹配，与歌手/专辑筛选叠加 |
+| 66 | 桌面组件播放按钮大一点且居中 | v1.0.31 | `widget_play.xml`：圆钮/按钮行 52dp→64dp、图标 padding 13→16dp，根布局 `gravity=center` 垂直居中；点击区域与行为不变 || 54 | 歌曲三点菜单标题栏：最多三行 + 衬线字体与动作区分 | v1.0.20 | `TrackActions.showMenu` 改 `setCustomTitle(view_menu_title)`：TextView `maxLines=3` + `fontFamily=serif` 加粗 16sp，与下方无衬线常规体菜单项明显区分；空标题兜底「未命名曲目」 |
 
 ---
 
@@ -263,4 +264,4 @@
 
 ---
 
-<p align="center"><sub>BMusic requirements · 更新于 v1.0.30</sub></p>
+<p align="center"><sub>BMusic requirements · 更新于 v1.0.31</sub></p>

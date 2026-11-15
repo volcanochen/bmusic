@@ -1,6 +1,6 @@
 {
-  "versionCode": 31,
-  "versionName": "1.0.30",
-  "notes": "1.曲库搜索升级为全字段检索：歌名、歌手、专辑、UP主、B站原标题（含合集/专辑名）、BV号/链接全部参与匹配\n2.例：搜「2005」可找到 B 站原标题含「2005年专辑」的全部曲目",
+  "versionCode": 32,
+  "versionName": "1.0.31",
+  "notes": "1.桌面组件播放按钮加大：粉色圆钮从 52dp 增大到 64dp，播放/暂停图标同步放大\n2.组件内容垂直居中：按钮行与歌名/歌手文字整体在组件内居中显示，不再贴顶",
   "url": "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk"
 }

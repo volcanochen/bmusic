@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 2x2 桌面小组件：左上一首 / 中播放暂停 / 右下一首 + 歌名/歌手两行。
-     左右两个控件用 weight 撑满剩余宽度，形成大点击热区；点文字或空白处进播放页。 -->
+<!-- 2x2 桌面小组件：左上一首 / 中播放暂停（64dp 大圆钮） / 右下一首 + 歌名/歌手两行。
+     左右两个控件用 weight 撑满剩余宽度，形成大点击热区；点文字或空白处进播放页。
+     根布局 gravity=center，整块内容在组件内垂直居中。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg"
-    android:gravity="center_horizontal"
+    android:gravity="center"
     android:orientation="vertical"
     android:paddingLeft="6dp"
     android:paddingRight="6dp"
@@ -15,7 +16,7 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="52dp"
+        android:layout_height="64dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -32,14 +33,14 @@
 
         <ImageView
             android:id="@+id/widget_toggle"
-            android:layout_width="52dp"
-            android:layout_height="52dp"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
             android:layout_marginLeft="3dp"
             android:layout_marginRight="3dp"
             android:background="@drawable/widget_btn"
             android:clickable="true"
             android:contentDescription="@string/widget_play_pause"
-            android:padding="13dp"
+            android:padding="16dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_play" />
 

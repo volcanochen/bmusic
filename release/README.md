@@ -4,14 +4,21 @@
 
 ## 当前版本
 
-- **版本号**：v1.0.30（`versionName 1.0.30` / `versionCode 31`）
+- **版本号**：v1.0.31（`versionName 1.0.31` / `versionCode 32`）
 - **包名**：`com.volcano.bmusic`
 - **最低系统**：Android 7.0（API 24）
 - **目标系统**：Android 14（API 34）
 - **体积**：约 286 KB（零第三方依赖，纯 Android SDK 构建；含 ZXing QR 编码/解码子集）
 - **APK 文件**：[`bmusic.apk`](bmusic.apk)（本目录内，始终为最新版）
 
+### v1.0.31 更新内容
+- **桌面组件播放按钮加大并居中**：粉色圆钮 52dp → 64dp，播放 / 暂停图标同步放大
+  （padding 13dp → 16dp）；按钮行 52dp → 64dp，根布局 `gravity=center`，
+  按钮行与歌名/歌手文字整体在组件内垂直居中，不再贴顶
+- 点击行为不变：左右热区切歌、圆钮播放暂停、点文字进播放页
+
 ### v1.0.30 更新内容
+
 - **曲库搜索改为全字段检索**：歌名、歌手、专辑、UP主、B 站原标题（含合集 / 专辑名）、
   BV 号 / 链接全部参与匹配（`MainActivity.reloadTracks` 的 haystack 加入 `srcTitle` 与 `id`）
   - 例：搜「2005」即可找到 B 站原标题为「陶喆2005年专辑《太平盛世》全碟欣赏」的全部 13 首
