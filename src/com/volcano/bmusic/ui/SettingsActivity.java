@@ -51,6 +51,13 @@ public class SettingsActivity extends Activity {
                 startActivity(new Intent(SettingsActivity.this, AboutActivity.class));
             }
         });
+        findViewById(R.id.btn_bili_account).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                save();
+                startActivityForResult(new Intent(SettingsActivity.this, BiliAccountActivity.class), 7);
+            }
+        });
         swAuto.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton v, boolean checked) {
@@ -118,6 +125,14 @@ public class SettingsActivity extends Activity {
             }
         });
         usage();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        // login may have replaced the cookie while the account page was open;
+        // refresh only on that return so an in-progress edit isn't overwritten
+        if (requestCode == 7) cookie.setText(App.getCookie());
     }
 
     private void usage() {

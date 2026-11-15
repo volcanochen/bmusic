@@ -47,31 +47,41 @@ public class ShareActivity extends Activity {
                             }
                         }, new Importer.Callback() {
                             @Override
-                            public void done(List<Track> added, String failMsg) {
+                            public void done(List<Track> added, List<Track> existing, String failMsg) {
                                 try {
                                     wait.dismiss();
                                 } catch (Exception ignored) {
                                 }
-                                if (added.isEmpty()) {
+                                // 链接已在曲库时，直接复用原有条目继续播放/加入队列，不重复入库
+                                final List<Track> targets = new ArrayList<Track>(added);
+                                targets.addAll(existing);
+                                if (targets.isEmpty()) {
                                     Toast.makeText(ShareActivity.this,
-                                            "解析失败：" + failMsg, Toast.LENGTH_LONG).show();
+                                            TextUtils.isEmpty(failMsg) ? "没有识别到有效的链接"
+                                                    : ("解析失败：" + failMsg),
+                                            Toast.LENGTH_LONG).show();
                                     finish();
                                     return;
                                 }
                                 ArrayList<String> ids = new ArrayList<String>();
-                                for (Track t : added) ids.add(t.id);
+                                for (Track t : targets) ids.add(t.id);
                                 for (Track t : Db.get(ShareActivity.this).allTracks()) {
                                     if (!ids.contains(t.id)) ids.add(t.id);
                                 }
                                 if (choice == 2) {
-                                    PlaybackService.append(ShareActivity.this, added.get(0).id);
+                                    PlaybackService.append(ShareActivity.this, targets.get(0).id);
                                 } else if (choice == 0) {
-                                    PlaybackService.setQueue(ShareActivity.this, -1, ids, added.get(0).id);
+                                    PlaybackService.setQueue(ShareActivity.this, -1, ids, targets.get(0).id);
                                 }
-                                Toast.makeText(ShareActivity.this,
-                                        added.size() > 1 ? ("已添加 " + added.size() + " 首到曲库")
-                                                : (choice == 0 ? "开始播放" : "已添加到曲库"),
-                                        Toast.LENGTH_SHORT).show();
+                                String msg;
+                                if (added.isEmpty()) {
+                                    msg = choice == 0 ? "已在曲库中，开始播放" : "链接已在曲库中，无需重复添加";
+                                } else if (added.size() > 1) {
+                                    msg = "已添加 " + added.size() + " 首到曲库";
+                                } else {
+                                    msg = choice == 0 ? "开始播放" : "已添加到曲库";
+                                }
+                                Toast.makeText(ShareActivity.this, msg, Toast.LENGTH_SHORT).show();
                                 finish();
                             }
                         });

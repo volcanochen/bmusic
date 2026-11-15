@@ -1,6 +1,8 @@
 package com.volcano.bmusic.model;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 /** One audio item = one page of a Bilibili video. */
 public class Track implements Serializable {
@@ -38,6 +40,8 @@ public class Track implements Serializable {
     /** runtime: remote audio url, not persisted */
     public transient String streamUrl;
     public transient long streamAt;
+    /** runtime: alternate CDN urls of the same stream, tried after a failed download */
+    public transient List<String> streamBackups = new ArrayList<String>();
     /** runtime: download progress -1 = idle, 0..100 */
     public transient int dlProgress = -1;
 

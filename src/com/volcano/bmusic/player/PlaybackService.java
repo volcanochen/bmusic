@@ -10,6 +10,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
 import android.media.MediaPlayer;
@@ -52,6 +54,8 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
     public static final String A_PREV = "bm.a.prev";
     public static final String A_STOP = "bm.a.stop";
     public static final String A_SEEK = "bm.a.seek";
+    /** 回到 App 时：若上次是因音频焦点被抢而中断，则从断点续播 */
+    public static final String A_RESUME = "bm.a.resume";
     public static final String A_APPEND = "bm.a.append";
     public static final String A_APPEND_IDS = "bm.a.append_ids";
     public static final String A_OPEN = "bm.a.open";
@@ -96,6 +100,20 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
     /** 离线播放轮询计数：连续跳过的未缓存曲目数（跑完一轮队列就停） */
     private int offlineSkip = 0;
 
+    // ---- 音频焦点中断 / 断点续播 -----------------------------------------
+    /** API 26+ 焦点请求：复用同一实例才能正确 abandon，并接收 delayed gain */
+    private AudioFocusRequest focusRequest;
+    /** 因别的 App（如 B 站视频）抢占焦点而暂停，焦点回来时要自动续播 */
+    private boolean resumeOnFocusGain;
+    /** 焦点请求被延迟（对方仍占着焦点）时暂存的动作，GAIN 后再执行 */
+    private Runnable pendingFocusAction;
+    /** 被短暂 duck（降低音量）中 */
+    private boolean ducked;
+    /** 服务被重建后要恢复到的断点（毫秒），-1 表示没有 */
+    private int resumePos = -1;
+    /** 进度轮询计数，每 10 次（约 5 秒）落盘一次播放位置 */
+    private int tickCount;
+
     private final Random rnd = new Random();
 
     public static PlaybackService get() {
@@ -132,7 +150,13 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
             } else if (A_NEXT.equals(a)) {
                 next(false);
             } else if (A_PREV.equals(a)) {
-                prev();
+                prev(intent.getBooleanExtra("force", false));
+            } else if (A_RESUME.equals(a)) {
+                // 回到 App 的兜底：仅当上次确实是「被别的 App 打断」才续播
+                if (!playing && resumeOnFocusGain) {
+                    resumeOnFocusGain = false;
+                    play();
+                }
             } else if (A_STOP.equals(a)) {
                 stopSelf0();
             } else if (A_SEEK.equals(a)) {
@@ -228,10 +252,8 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
             unregisterReceiver(noisy);
         } catch (Exception ignored) {
         }
-        try {
-            audio.abandonAudioFocus(this);
-        } catch (Exception ignored) {
-        }
+        savePosition();
+        abandonFocus();
         releasePlayer();
         if (session != null) session.release();
         if (cur != null) App.prefs().edit().putString("last_id", cur.id).apply();
@@ -347,6 +369,10 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         String id = App.prefs().getString("last_id", null);
         long pid = App.prefs().getLong("queue_pid", -1);
         int idx = App.prefs().getInt("queue_index", -1);
+        // 进程被回收后，把上次中断时的播放位置带回来（仅当还是同一首）
+        String posId = App.prefs().getString("last_pos_id", null);
+        int pos = App.prefs().getInt("last_pos", -1);
+        if (id != null && id.equals(posId) && pos > 0) resumePos = pos;
         if (id != null) {
             ArrayList<String> ids;
             if (pid > 0) {
@@ -504,7 +530,10 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         Track t = Db.get(this).get(id);
         if (t == null) return;
         cur = t;
-        App.prefs().edit().putString("last_id", id).apply();
+        // 换歌 = 放弃旧断点
+        App.prefs().edit().putString("last_id", id)
+                .remove("last_pos").remove("last_pos_id").apply();
+        resumePos = -1;
         retry = 0;
         loading = true;
         startWhenReady = autoplay;
@@ -530,16 +559,86 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         com.volcano.bmusic.util.Downloader.start(this, t);
     }
 
+    /**
+     * 申请音频焦点后再执行播放动作。
+     * API 26+ 用 AudioFocusRequest 并开启 delayed gain：若此刻焦点被别的 App
+     * （B 站视频、导航语音等）占着，不立刻出声，而是把动作挂起，等对方释放焦点
+     * 时由 onAudioFocusChange(GAIN) 执行，从而实现「中断后能续回来」。
+     */
     private void requestFocus(final Runnable then) {
         try {
-            int r = audio.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
-            if (r == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-                then.run();
+            int r;
+            if (Build.VERSION.SDK_INT >= 26) {
+                if (focusRequest == null) {
+                    AudioAttributes attrs = new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build();
+                    focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                            .setAudioAttributes(attrs)
+                            .setWillPauseWhenDucked(false) // 自己 duck，别让系统代我们暂停
+                            .setAcceptsDelayedFocusGain(true)
+                            .setOnAudioFocusChangeListener(this, handler)
+                            .build();
+                }
+                r = audio.requestAudioFocus(focusRequest);
             } else {
-                then.run();
+                r = audio.requestAudioFocus(this, AudioManager.STREAM_MUSIC,
+                        AudioManager.AUDIOFOCUS_GAIN);
             }
-        } catch (Exception e) {
+            if (r == AudioManager.AUDIOFOCUS_REQUEST_DELAYED) {
+                Log.i(TAG, "audio focus delayed, waiting for GAIN");
+                pendingFocusAction = then;
+                resumeOnFocusGain = true;
+                return;
+            }
+            pendingFocusAction = null;
             then.run();
+        } catch (Exception e) {
+            Log.e(TAG, "requestFocus", e);
+            then.run();
+        }
+    }
+
+    /** 只有用户主动暂停 / 停止 / 服务销毁时才放弃焦点，否则收不到回来的 GAIN。 */
+    private void abandonFocus() {
+        try {
+            if (Build.VERSION.SDK_INT >= 26) {
+                if (focusRequest != null) audio.abandonAudioFocusRequest(focusRequest);
+            } else {
+                audio.abandonAudioFocus(this);
+            }
+        } catch (Exception ignored) {
+        }
+        pendingFocusAction = null;
+    }
+
+    /** 短暂失去焦点但允许 duck 时压低音量，GAIN 后恢复。 */
+    private void duck(boolean on) {
+        if (mp == null) return;
+        try {
+            if (on && !ducked) {
+                ducked = true;
+                mp.setVolume(0.25f, 0.25f);
+            } else if (!on && ducked) {
+                ducked = false;
+                mp.setVolume(1f, 1f);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** 记住断点：被动中断、主动暂停、服务被回收时都能从原位置续播。 */
+    private void savePosition() {
+        try {
+            if (cur == null) return;
+            int p = position();
+            if (p <= 0) return;
+            App.prefs().edit()
+                    .putString("last_pos_id", cur.id)
+                    .putInt("last_pos", p)
+                    .apply();
+        } catch (Exception ignored) {
         }
     }
 
@@ -595,7 +694,13 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
             initPlayer();
         }
         mpReady = false;
-        pendingSeek = -1;
+        // 服务重建后从中断处继续；正常切歌则从 0 开始
+        if (resumePos >= 0 && t.id.equals(id)) {
+            pendingSeek = resumePos;
+            resumePos = -1;
+        } else {
+            pendingSeek = -1;
+        }
         try {
             if (t.hasLocal()) {
                 mp.setAudioStreamType(AudioManager.STREAM_MUSIC);
@@ -799,7 +904,17 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
         tick();
     }
 
+    /** 用户主动暂停（按钮 / 拔耳机 / 停止）：放弃焦点，焦点回来也不自动续播。 */
     public void pause() {
+        pauseInternal(true);
+    }
+
+    /** 被别的 App 抢占焦点而暂停：保留焦点注册，等 GAIN 自动从断点续播。 */
+    private void pauseForFocus() {
+        pauseInternal(false);
+    }
+
+    private void pauseInternal(boolean userInitiated) {
         if (mp != null && mpReady && playing) {
             try {
                 mp.pause();
@@ -807,13 +922,15 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
             }
         }
         playing = false;
+        savePosition();
+        duck(false);
+        if (userInitiated) {
+            resumeOnFocusGain = false;
+            abandonFocus();
+        }
         broadcastState();
         refreshNotify();
         updateMetadata();
-        try {
-            audio.abandonAudioFocus(this);
-        } catch (Exception ignored) {
-        }
     }
 
     public void toggle() {
@@ -838,8 +955,16 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
     }
 
     public void prev() {
+        prev(false);
+    }
+
+    /**
+     * @param force true 时无条件切上一首（桌面小组件用）；false 时若已播放超过
+     *              4 秒则先回到本曲开头（通知栏 / 耳机按键的常见行为）。
+     */
+    public void prev(boolean force) {
         if (queueIds.isEmpty()) return;
-        if (position() > 4000) {
+        if (!force && position() > 4000) {
             seek(0);
             return;
         }
@@ -961,6 +1086,8 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
             if (Build.VERSION.SDK_INT >= 21 && session != null && false) {
                 // reserved
             }
+            // 每 10 个 tick（约 5 秒）落盘一次进度，进程被杀也能续播
+            if (playing && ++tickCount % 10 == 0) savePosition();
             if (playing) tick();
         }
     };
@@ -1117,14 +1244,39 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
 
     @Override
     public void onAudioFocusChange(int focusChange) {
+        Log.i(TAG, "audioFocus change=" + focusChange + " playing=" + playing
+                + " resume=" + resumeOnFocusGain);
         switch (focusChange) {
             case AudioManager.AUDIOFOCUS_LOSS:
+                // 长期被占用（切去 B 站看视频）。注意不能 abandonAudioFocus：
+                // 一旦放弃注册，对方释放焦点时就不会再回调 GAIN，也就永远续不回来。
+                if (playing) resumeOnFocusGain = true;
+                pauseForFocus();
+                break;
             case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
-                pause();
+                // 短暂占用（语音、通知音）：结束后系统会给 GAIN，自动续播
+                if (playing) resumeOnFocusGain = true;
+                pauseForFocus();
                 break;
             case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                duck(true);
                 break;
             case AudioManager.AUDIOFOCUS_GAIN:
+            case AudioManager.AUDIOFOCUS_GAIN_TRANSIENT:
+            case AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK:
+                duck(false);
+                if (pendingFocusAction != null) {
+                    // 之前请求焦点时对方正占着，现在终于可以执行那次切歌/播放
+                    Runnable r = pendingFocusAction;
+                    pendingFocusAction = null;
+                    resumeOnFocusGain = false;
+                    r.run();
+                } else if (resumeOnFocusGain) {
+                    resumeOnFocusGain = false;
+                    // MediaPlayer 仍停在暂停位置，start() 即为断点续播
+                    Log.i(TAG, "resume playback after focus gain, pos=" + position());
+                    play();
+                }
                 break;
             default:
                 break;
@@ -1132,6 +1284,17 @@ public class PlaybackService extends Service implements AudioManager.OnAudioFocu
     }
 
     // ------------------------------------------------------- static helpers
+
+    /**
+     * 从别的 App（视频等）切回 BMusic 时调用：仅当上次是被音频焦点打断、
+     * 且服务还活着时，重新申请焦点并从断点续播。服务没启动 / 用户主动暂停过
+     * 都不会触发，避免「一打开 App 就自动出声」。
+     */
+    public static void resumeIfInterrupted(Context c) {
+        PlaybackService svc = get();
+        if (svc == null || svc.playing || !svc.resumeOnFocusGain) return;
+        act(c, A_RESUME);
+    }
 
     public static void toggle(Context c) {
         act(c, A_TOGGLE);

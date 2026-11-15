@@ -481,6 +481,55 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/btn_bili_account_me"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginLeft="14dp"
+                    android:layout_marginRight="14dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/shape_card"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingLeft="14dp"
+                    android:paddingRight="14dp">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_bili"
+                        android:tint="@color/text_sub" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tv_bili_account"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="B站账号 / 收藏夹导入"
+                            android:textColor="@color/text"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="授权登录，把 bmusic 收藏夹里的视频/合集加进曲库"
+                            android:textColor="@color/text_dim"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_next"
+                        android:tint="@color/text_dim" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:id="@+id/btn_update"
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
@@ -565,7 +614,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="曲库、歌单、最近播放导出为 JSON 到下载目录"
+                            android:text="按曲库歌曲导出 JSON（自动去重，不记录来源）到下载目录"
                             android:textColor="@color/text_dim"
                             android:textSize="11sp" />
                     </LinearLayout>
@@ -607,7 +656,50 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="从备份 JSON 文件导入（合并到现有数据）"
+                            android:text="从备份 JSON 文件导入（同链接自动合并，不重复添加）"
+                            android:textColor="@color/text_dim"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btn_dedup"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginLeft="14dp"
+                    android:layout_marginRight="14dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/shape_card"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingLeft="14dp"
+                    android:paddingRight="14dp">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_check"
+                        android:tint="@color/text_sub" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="曲库去重"
+                            android:textColor="@color/text"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/tv_dedup"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="按视频链接合并重复曲目，保留缓存与播放次数"
                             android:textColor="@color/text_dim"
                             android:textSize="11sp" />
                     </LinearLayout>

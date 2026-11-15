@@ -21,30 +21,48 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 
 /**
- * 数据备份/恢复：曲库、歌单、最近播放导出为 JSON（不含音频文件本体）。
- * 导出写到公共 Download 目录（API29+ 走 MediaStore，无需权限）。
- * 恢复是"合并"语义：已存在的曲目/歌单不覆盖。
+ * 数据备份/恢复：以「当前曲库里的歌曲」为准导出 JSON（含歌单、最近播放，
+ * 不含音频文件本体）。
+ *
+ * <p>备份只记录歌曲本身的链接与元信息，不记录它是手动添加的、从 B 站收藏夹导入的，
+ * 还是别的渠道来的；去重也只看链接。导出写到公共 Download 目录
+ * （API29+ 走 MediaStore，无需权限）。恢复是「合并」语义：同链接的曲目不覆盖、不重复。
  */
 public final class Backup {
 
     private Backup() {
     }
 
-    /** 生成备份 JSON，失败返回 null。 */
+    /** 生成备份 JSON（曲库歌曲快照，已按链接去重、不含任何来源信息），失败返回 null。 */
     public static String export(Context c) {
         Db db = Db.get(c);
         try {
             JSONObject o = new JSONObject();
             o.put("app", "bmusic");
-            o.put("version", 1);
+            o.put("version", 2);
             o.put("exported", System.currentTimeMillis());
 
+            // 曲库即事实来源：同链接只导出一行，重复行的 id 映射到保留行，
+            // 这样歌单/最近播放里的引用也不会指向被丢掉的那一行。
+            HashMap<String, String> linkToId = new HashMap<String, String>();
+            HashMap<String, String> idMap = new HashMap<String, String>();
             JSONArray tracks = new JSONArray();
             for (Track t : db.allTracks()) {
+                String link = TrackKey.of(t);
+                if (link == null) continue;
+                String keep = linkToId.get(link);
+                if (keep != null) {
+                    idMap.put(t.id, keep);
+                    continue;
+                }
+                linkToId.put(link, t.id);
                 JSONObject t2 = new JSONObject();
                 t2.put("id", t.id);
                 t2.put("bvid", t.bvid);
@@ -65,6 +83,7 @@ public final class Backup {
                 tracks.put(t2);
             }
             o.put("tracks", tracks);
+            o.put("trackCount", tracks.length());
 
             JSONArray pls = new JSONArray();
             for (Object[] p : db.playlistsFull()) {
@@ -74,7 +93,11 @@ public final class Backup {
                 p2.put("created", p[2]);
                 p2.put("kind", p[3]);
                 JSONArray tids = new JSONArray();
-                for (Track t : db.tracksOf(pid)) tids.put(t.id);
+                HashSet<String> added = new HashSet<String>();
+                for (Track t : db.tracksOf(pid)) {
+                    String id = idMap.containsKey(t.id) ? idMap.get(t.id) : t.id;
+                    if (id != null && added.add(id)) tids.put(id);
+                }
                 p2.put("tracks", tids);
                 pls.put(p2);
             }
@@ -82,9 +105,10 @@ public final class Backup {
 
             JSONArray his = new JSONArray();
             for (Object[] h : db.historyAll()) {
-                his.put(new JSONObject()
-                        .put("tid", (String) h[0])
-                        .put("played", (Long) h[1]));
+                String tid = (String) h[0];
+                String id = idMap.containsKey(tid) ? idMap.get(tid) : tid;
+                if (id == null || db.get(id) == null) continue;
+                his.put(new JSONObject().put("tid", id).put("played", (Long) h[1]));
             }
             o.put("history", his);
             return o.toString();
@@ -130,7 +154,8 @@ public final class Backup {
     }
 
     /**
-     * 从备份 JSON 恢复（合并语义）：已存在的曲目/歌单不覆盖。
+     * 从备份 JSON 恢复（按曲库歌曲合并）：链接相同的曲目视为同一首，
+     * 已有条目不覆盖、不重复插入；来源信息本来就没记录，无需处理。
      * 返回新导入的曲目数，-1 表示解析失败。
      */
     public static int restore(Context c, String json) {
@@ -139,18 +164,33 @@ public final class Backup {
             if (!"bmusic".equals(o.optString("app"))) return -1;
             Db db = Db.get(c);
             int imported = 0;
+            // 备份里的 id -> 曲库里实际保留的 id（老备份的 id 格式可能和现在不同）
+            HashMap<String, String> idMap = new HashMap<String, String>();
 
             JSONArray tracks = o.optJSONArray("tracks");
             if (tracks != null) {
                 for (int i = 0; i < tracks.length(); i++) {
                     JSONObject t2 = tracks.getJSONObject(i);
                     String id = t2.optString("id", null);
-                    if (id == null || db.get(id) != null) continue;
-                    Track t = new Track(id, t2.optString("bvid", ""),
-                            t2.optLong("cid"), t2.optInt("page"));
+                    String bvid = t2.optString("bvid", "");
+                    long cid = t2.optLong("cid");
+                    int page = t2.optInt("page", 1);
+                    String link = TrackKey.of(bvid, cid, page, id);
+                    if (link == null) continue;
+                    Track old = db.findByLink(link);
+                    if (old != null) {
+                        if (id != null) idMap.put(id, old.id);
+                        continue;
+                    }
+                    String keepId = (id == null || id.isEmpty()) ? link : id;
+                    Track t = new Track(keepId, bvid, cid, page);
                     t.title = t2.optString("title", null);
                     t.author = t2.optString("author", null);
                     t.cover = t2.optString("cover", null);
+                    t.srcTitle = t2.optString("srcTitle", null);
+                    t.song = t2.optString("song", null);
+                    t.artist = t2.optString("artist", null);
+                    t.album = t2.optString("album", null);
                     t.duration = t2.optLong("duration");
                     t.added = t2.optLong("added", System.currentTimeMillis());
                     t.lastPlayed = t2.optLong("lastPlayed", 0);
@@ -160,13 +200,14 @@ public final class Backup {
                     t.cached = false;
                     t.path = null;
                     db.upsert(t);
+                    if (id != null) idMap.put(id, keepId);
                     imported++;
                 }
             }
 
             JSONArray pls = o.optJSONArray("playlists");
             if (pls != null) {
-                java.util.ArrayList<Object[]> existing = db.playlistsFull();
+                ArrayList<Object[]> existing = db.playlistsFull();
                 for (int i = 0; i < pls.length(); i++) {
                     JSONObject p = pls.getJSONObject(i);
                     String name = p.optString("name", "");
@@ -181,13 +222,14 @@ public final class Backup {
                     if (pid < 0) pid = db.addPlaylist(name);
                     JSONArray tids = p.optJSONArray("tracks");
                     if (tids == null) continue;
-                    java.util.ArrayList<String> in = new java.util.ArrayList<String>();
+                    HashSet<String> in = new HashSet<String>();
                     for (Track t : db.tracksOf(pid)) in.add(t.id);
                     for (int j = 0; j < tids.length(); j++) {
                         String tid = tids.optString(j, null);
-                        if (tid == null || in.contains(tid)) continue;
-                        db.addTo(pid, tid);
-                        in.add(tid);
+                        if (tid == null) continue;
+                        String mapped = idMap.containsKey(tid) ? idMap.get(tid) : tid;
+                        if (mapped == null || db.get(mapped) == null || !in.add(mapped)) continue;
+                        db.addTo(pid, mapped);
                     }
                 }
             }
@@ -197,10 +239,14 @@ public final class Backup {
                 for (int i = 0; i < his.length(); i++) {
                     JSONObject h = his.getJSONObject(i);
                     String tid = h.optString("tid", null);
-                    if (tid == null || db.get(tid) == null) continue;
-                    db.insertHistory(tid, h.optLong("played"));
+                    if (tid == null) continue;
+                    String mapped = idMap.containsKey(tid) ? idMap.get(tid) : tid;
+                    if (mapped == null || db.get(mapped) == null) continue;
+                    db.insertHistory(mapped, h.optLong("played"));
                 }
             }
+            // 兜底：把老版本遗留的、同链接不同 id 的重复行也合并掉
+            db.dedup();
             return imported;
         } catch (Exception e) {
             return -1;

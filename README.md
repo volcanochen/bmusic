@@ -8,7 +8,7 @@
 
 [![Release](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fvolcanochen%2Fbmusic%2Fmain%2Frelease%2Fversion.json&query=%24.versionName&label=version&color=pink&logo=github)](https://github.com/volcanochen/bmusic/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Android%207.0%2B-3ddc84?logo=android&logoColor=white)](#-快速开始)
-[![Size](https://img.shields.io/badge/APK-~255%20KB-informational)](#%EF%B8%8F-技术栈)
+[![Size](https://img.shields.io/badge/APK-~282%20KB-informational)](#%EF%B8%8F-技术栈)
 [![Deps](https://img.shields.io/badge/dependencies-zero-brightgreen)](#%EF%B8%8F-技术栈)
 [![Build](https://img.shields.io/badge/build-no%20Gradle-lightgrey)](#-从源码构建)
 [![License](https://img.shields.io/badge/for-personal%20use-orange)](#%EF%B8%8F-免责声明)
@@ -24,7 +24,7 @@
 
 BMusic 是一个**零第三方依赖、不依赖 Gradle** 的原生 Android 音乐播放器。它不下载视频，而是直接从 B 站取出**纯音频流**（DASH 音轨），配上完整的播放列表、后台播放、通知栏控制、离线缓存和精致播放页，让 B 站的视频内容也能被"当歌听"。
 
-整个 App 从界面、网络、播放、缓存到数据库全部手写，APK 只有 **约 255 KB**——比很多应用的图标还小。
+整个 App 从界面、网络、播放、缓存到数据库全部手写，APK 只有 **约 282 KB**——比很多应用的图标还小。
 
 ---
 
@@ -56,6 +56,7 @@ BMusic 是一个**零第三方依赖、不依赖 Gradle** 的原生 Android 音�
 - **智能识别**：从任意文本提取 `BV 号` / `av 号` / `b23.tv 短链`，自动跟随短链跳转
 - **多 P 精确**：按分 P 取对应音轨，列表直接显示「分P名 · 视频页标题」原始信息，来源一目了然
 - **元信息补全**：从标题解析「歌名 - 歌手」，联网查 **QQ 音乐** 补真实专辑名；对不上宁可显示 Unknown，绝不张冠李戴
+- **B站账号联动**：B 站 App 扫码授权登录 → 自动找到/创建名为 **bmusic** 的收藏夹 → 收藏的视频一键导入曲库；登录态同时降低取流风控概率
 
 ### 📼 离线缓存，断网也能听
 - **一键缓存**：本地优先播放，不再依赖网络；断网自动跳过未缓存曲目
@@ -78,8 +79,9 @@ BMusic 是一个**零第三方依赖、不依赖 Gradle** 的原生 Android 音�
 
 ### 🧰 贴心小件
 - **折叠屏 / 大屏自适应**：近方屏、分屏、浮窗、旋转全都不重建 Activity、自动重排布局（OPPO Find N 系真机实测）
-- **桌面 2×2 小组件**：不进 App 直接播放 / 暂停
-- **数据备份 / 恢复**：一键导出曲库、歌单、历史为 JSON
+- **桌面 2×2 小组件**：不进 App 直接上一首 / 播放暂停 / 下一首
+- **曲库按链接去重**：同一个 BV 号 + 分 P 只留一首，导入 / 手动添加 / 恢复备份都不会重复，缓存与播放次数不丢；「我的」页可一键整理
+- **数据备份 / 恢复**：按当前曲库歌曲导出 JSON（自动去重，不记录来源），恢复时同链接自动合并
 - **应用内更新**：检查新版本并直接下载安装
 
 ---
@@ -134,16 +136,19 @@ adb install -r build/bmusic.apk
 | **批量播放** | 曲库右上「播放 N 首」：当前筛选范围全部入队并播放 |
 | **歌词** | 播放页「歌词」打开歌词面板，自动匹配，可手动搜索切换 |
 | **离线** | 播放页「缓存到本地」，或设置里开「自动缓存下一首」 |
-| **小组件** | 桌面长按 → 小组件 → BMusic：不进 App 一键播放 / 暂停 |
+| **小组件** | 桌面长按 → 小组件 → BMusic：左「上一首」/ 中「播放暂停」/ 右「下一首」，左右都是大点击热区（点文字或空白处进播放页） |
+| **中断续播** | 切去 B 站/视频 App 被抢走音频焦点后暂停，切回来自动从断点继续（服务被回收也会记住进度） |
+| **账号登录** | 「我的」→「B站账号」→ 点「打开 B 站 App 授权登录」→ 在 B 站 App 点「确认」（无需密码、无需第二台设备）；二维码仅作备用 |
+| **收藏夹导入** | 在 B 站 App 把视频/合集收藏进「bmusic」→ 曲库右上「+」→「从 B 站收藏夹导入（bmusic）」直接导入；账号页也有导入按钮 |
 
 ### 关于音质与 Cookie
 
-不填 Cookie 也能正常取流（通常 64K / 132K）。在「设置」粘贴网页版 B 站 Cookie 后可解锁 **192K**：
+不填 Cookie 也能正常取流（通常 64K / 132K）。解锁 **192K** 有两种方式：
 
-```text
-登录 bilibili.com → F12 开发者工具 → Network → 复制任意请求的 Cookie
-→ 粘贴到 BMusic 设置页
-```
+1. **推荐**：「我的」或「设置」→「B站账号」→ 用 B 站 App 一键授权，凭证自动保存；登录态还能让取流更稳定
+2. 手动：登录 bilibili.com → F12 → Network → 复制请求 Cookie → 粘贴到 BMusic 设置页
+
+登录后账号页会自动查找 **bmusic** 收藏夹，没有就创建一个；之后在 B 站 App 里收藏视频，回到 BMusic 一键导入即可（合集展开全部视频，多 P 视频全部分 P 导入）。
 
 ---
 
@@ -162,9 +167,9 @@ adb install -r build/bmusic.apk
 </details>
 
 <details>
-<summary><b>为什么有时解析失败？</b></summary>
+<summary><b>为什么有时提示「请求被拦截(-412)」？</b></summary>
 
-可能触发了 B 站风控或接口限制。设置里填 Cookie 通常能解决；App 也会自动刷新请求签名（wbi）后重试。
+这是 B 站 Web 风控。v1.0.25 起会自动重建设备身份（buvid3/buvid4 + bili_ticket）、重取 wbi 签名、换成视频页 Referer 后退避重试，并在 `wbi/playurl → playurl → durl` 三级端点间降级、下载失败时切换备用 CDN。若仍被拦截，在「B站账号」里一键授权登录（登录态 + 稳定设备指纹）通常能解决；也可稍后再试。
 </details>
 
 <details>
@@ -187,11 +192,13 @@ adb install -r build/bmusic.apk
 | --- | --- |
 | 语言 / 环境 | Java 8 · minSdk 24（Android 7.0）· targetSdk 34 |
 | 界面 | 原生 View + XML 布局（无任何 UI 库），自适应分屏 / 浮窗 / 折叠屏 |
-| 网络 | `HttpURLConnection` + `CookieManager`，手写 **wbi 请求签名**（mixin key 混淆表 + MD5） |
-| 取流 | `x/player/playurl` DASH 接口，按音质分级取音轨（30280 > 30232 > 30216） |
+| 网络 | `HttpURLConnection` + 手写 **wbi 请求签名**（mixin key 混淆表 + MD5）、持久化设备指纹、`bili_ticket` 设备票据、风控自动重试 |
+| 取流 | `x/player/wbi/playurl` → `x/player/playurl` → `fnval=0` durl 三级降级，按音质分级取音轨（30280 > 30232 > 30216），备用 CDN 自动切换 |
+| 登录 | B 站网页二维码授权；`bilibili://forward?-Btarget=` 把授权链接交给 B 站 App 内 WebView 一键确认，2s 轮询 `qrcode/poll` 收结果，从 `Set-Cookie` 提取 `SESSDATA / bili_jct / DedeUserID` |
+| 收藏夹 | `x/v3/fav/folder/*` 查找/创建 `bmusic`，`x/v3/fav/resource/list` 分页读取并导入曲库 |
 | 播放 | `MediaPlayer` + `MediaSession` + `Notification.MediaStyle` |
 | 元信息 | 本地规则解析标题 + QQ 音乐搜索补专辑（门控：歌名一致 + 歌手匹配） |
-| 扫码 | ZXing 3.3.3 QR 解码子集（Apache 2.0，vendored） |
+| 扫码 | ZXing 3.3.3 QR **编码 + 解码**子集（Apache 2.0，vendored，无 jar/aar） |
 | 数据 | `SQLiteOpenHelper`（tracks / playlists / pl_tracks / history） |
 | 构建 | `aapt2 → javac → d8 → zipalign → apksigner` 纯脚本流水线 |
 

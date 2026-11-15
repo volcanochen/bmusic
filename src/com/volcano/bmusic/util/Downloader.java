@@ -12,8 +12,11 @@ import com.volcano.bmusic.model.Track;
 import com.volcano.bmusic.net.Http;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -83,7 +86,7 @@ public class Downloader {
                     final long[] prevDone = {-1};
                     final long[] prevTime = {-1};
                     final long[] ema = {-1}; // smoothed speed (bytes/sec)
-                    Http.download(url, dst, Bili.mediaHeaders(Bili.refererOf(t)), new Http.Progress() {
+                    Http.Progress cb = new Http.Progress() {
                         @Override
                         public void on(long done, long total) {
                             int pct = total > 0 ? (int) (done * 100 / total) : 0;
@@ -109,7 +112,32 @@ public class Downloader {
                             }
                             broadcast(c, t.id, 0, pct, spd);
                         }
-                    });
+                    };
+                    // CDN nodes can reject a single host; try the backup urls
+                    // the playurl api returned before giving up.
+                    List<String> urls = new ArrayList<String>();
+                    urls.add(url);
+                    if (t.streamBackups != null) {
+                        for (String b : t.streamBackups) {
+                            if (b != null && b.length() > 0 && !urls.contains(b)) urls.add(b);
+                        }
+                    }
+                    IOException io = null;
+                    boolean downloaded = false;
+                    Map<String, String> headers = Bili.mediaHeaders(Bili.refererOf(t));
+                    for (String u : urls) {
+                        try {
+                            Http.download(u, dst, headers, cb);
+                            downloaded = true;
+                            break;
+                        } catch (IOException e) {
+                            io = e;
+                            prevDone[0] = -1;
+                            prevTime[0] = -1;
+                            ema[0] = -1;
+                        }
+                    }
+                    if (!downloaded) throw (io != null ? io : new IOException("下载失败"));
                     if (dst.exists() && dst.length() > 8 * 1024) {
                         Db.get(c).setCache(t.id, true, dst.getAbsolutePath());
                         synchronized (Downloader.class) {

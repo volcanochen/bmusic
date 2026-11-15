@@ -36,7 +36,7 @@ echo "== 2/7 link apk =="
   -o "$OUT/app.apk" \
   --java "$GEN" \
   --min-sdk-version 24 --target-sdk-version 34 \
-  --version-code 25 --version-name "1.0.24" \
+  --version-code 30 --version-name "1.0.29" \
   -A "$ROOT/assets" \
   "${RESZIPS[@]}"
 
@@ -96,4 +96,6 @@ rm -f "$OUT/bmusic.apk"
   "$OUT/app-aligned.apk"
 
 ls -l "$OUT/bmusic.apk"
+# 发布目录始终与刚构建出的 APK 一致，避免装到手机上的还是旧包
+cp -f "$OUT/bmusic.apk" "$ROOT/release/bmusic.apk"
 echo "BUILD OK"

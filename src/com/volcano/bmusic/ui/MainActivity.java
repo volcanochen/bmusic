@@ -31,6 +31,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -516,6 +517,15 @@ public class MainActivity extends Activity {
                 startActivity(new Intent(MainActivity.this, SettingsActivity.class));
             }
         });
+        View btnBili = findViewById(R.id.btn_bili_account_me);
+        if (btnBili != null) {
+            btnBili.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startActivity(new Intent(MainActivity.this, BiliAccountActivity.class));
+                }
+            });
+        }
         View btnUpdate = findViewById(R.id.btn_update);
         if (btnUpdate != null) {
             btnUpdate.setOnClickListener(new View.OnClickListener() {
@@ -578,6 +588,15 @@ public class MainActivity extends Activity {
                         Toast.makeText(MainActivity.this,
                                 "没有可用的文件选择器", Toast.LENGTH_SHORT).show();
                     }
+                }
+            });
+        }
+        View btnDedup = findViewById(R.id.btn_dedup);
+        if (btnDedup != null) {
+            btnDedup.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    doDedup();
                 }
             });
         }
@@ -648,6 +667,31 @@ public class MainActivity extends Activity {
                             Toast.makeText(MainActivity.this,
                                     "备份失败：" + fErr, Toast.LENGTH_LONG).show();
                         }
+                    }
+                });
+            }
+        });
+    }
+
+    /** 手动整理曲库：合并链接相同的重复行，保留缓存、收藏与播放次数。 */
+    private void doDedup() {
+        Toast.makeText(this, "正在检查重复曲目…", Toast.LENGTH_SHORT).show();
+        App.postBg(new Runnable() {
+            @Override
+            public void run() {
+                final int n = Db.get(MainActivity.this).dedup();
+                App.runOnUi(new Runnable() {
+                    @Override
+                    public void run() {
+                        String msg = n > 0 ? ("已合并 " + n + " 首重复曲目") : "曲库没有重复曲目";
+                        Toast.makeText(MainActivity.this, msg, Toast.LENGTH_LONG).show();
+                        TextView tv = (TextView) findViewById(R.id.tv_dedup);
+                        if (tv != null) {
+                            tv.setText(n > 0
+                                    ? "已合并 " + n + " 首重复曲目，缓存与播放次数已保留"
+                                    : "按视频链接合并重复曲目，保留缓存与播放次数");
+                        }
+                        reloadAll();
                     }
                 });
             }
@@ -1130,12 +1174,12 @@ public class MainActivity extends Activity {
             }
         }, new Importer.Callback() {
             @Override
-            public void done(List<Track> added, String failMsg) {
+            public void done(List<Track> added, List<Track> existing, String failMsg) {
                 try {
                     wait.dismiss();
                 } catch (Exception ignored) {
                 }
-                Importer.toastResult(MainActivity.this, added, failMsg);
+                Importer.toastResult(MainActivity.this, added, existing, failMsg);
                 reloadAll();
                 if (!added.isEmpty()) {
                     // play the first one right away if library was empty before
@@ -1457,8 +1501,8 @@ public class MainActivity extends Activity {
                             } else {
                                 reloadAll();
                                 Toast.makeText(MainActivity.this,
-                                        n > 0 ? ("已导入 " + n + " 首曲目")
-                                              : "备份内容已存在，未新增曲目",
+                                        n > 0 ? ("已导入 " + n + " 首曲目，重复链接已自动合并")
+                                              : "备份内容已存在或链接重复，未新增曲目",
                                         Toast.LENGTH_LONG).show();
                             }
                         }
@@ -1484,17 +1528,21 @@ public class MainActivity extends Activity {
         doImport(text);
     }
 
-    /** 「+」来源菜单：粘贴链接 / 扫码 / 相册识别 / 手动输入。 */
+    /** 「+」来源菜单：粘贴链接 / 扫码 / 相册识别 / 手动输入 / B站收藏夹批量导入。 */
     private void showAddSourceDialog() {
         final String[] items = {
                 getString(R.string.menu_paste),
                 getString(R.string.menu_scan),
                 getString(R.string.menu_pick_image),
-                getString(R.string.menu_manual)
+                getString(R.string.menu_manual),
+                getString(R.string.menu_bili_fav)
         };
+        // Compact rows: the stock setItems() rows are too tall for 5 entries in landscape.
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(
+                this, R.layout.dialog_add_item, items);
         new AlertDialog.Builder(this)
                 .setTitle(R.string.add_title)
-                .setItems(items, new DialogInterface.OnClickListener() {
+                .setAdapter(adapter, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int which) {
                         if (which == 0) {
@@ -1520,8 +1568,14 @@ public class MainActivity extends Activity {
                                 Toast.makeText(MainActivity.this,
                                         "没有可用的图片选择器", Toast.LENGTH_SHORT).show();
                             }
-                        } else {
+                        } else if (which == 3) {
                             showAddDialog();
+                        } else {
+                            // Batch source: the "bmusic" favourite folder of the signed-in account.
+                            // The account page starts the import right away (or right after login).
+                            Intent i = new Intent(MainActivity.this, BiliAccountActivity.class);
+                            i.putExtra(BiliAccountActivity.EXTRA_AUTO_IMPORT, true);
+                            startActivity(i);
                         }
                     }
                 })
@@ -1754,6 +1808,21 @@ public class MainActivity extends Activity {
         super.onResume();
         reloadAll();
         refreshMini();
+        refreshAccountLabel();
+        // 被 B 站/视频 App 抢走音频焦点后切回来：从断点续播（用户主动暂停过则不动）
+        PlaybackService.resumeIfInterrupted(this);
+    }
+
+    /** Show the login state on the "me" page entry. */
+    private void refreshAccountLabel() {
+        TextView v = (TextView) findViewById(R.id.tv_bili_account);
+        if (v == null) return;
+        if (Bili.loggedIn()) {
+            String n = App.biliName();
+            v.setText("B站账号 · " + (n.isEmpty() ? "已登录" : n));
+        } else {
+            v.setText("B站账号 / 收藏夹导入");
+        }
     }
 
     @Override

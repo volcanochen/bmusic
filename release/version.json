@@ -1,6 +1,6 @@
 {
-  "versionCode": 25,
-  "versionName": "1.0.24",
-  "notes": "1.列表歌曲标题/副标题靠左对齐（播放页仍居中），更符合列表阅读习惯\n2.修复「已缓存/缓存中」按钮出现两层药丸的问题，缓存进度填充恢复为整颗药丸",
+  "versionCode": 30,
+  "versionName": "1.0.29",
+  "notes": "1.按用户要求回退 v1.0.28 的组件热区改动：恢复 v1.0.26 的三键布局与点击范围（左右热区仅在顶部按钮行，点歌名/空白处进播放页）\n2.桌面组件系统不支持滑动手势，切歌维持点击左右热区方案",
   "url": "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk"
 }

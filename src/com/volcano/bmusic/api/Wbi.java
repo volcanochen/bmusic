@@ -27,9 +27,14 @@ public final class Wbi {
     }
 
     public void setKeys(String imgKey, String subKey) {
+        setKeys(imgKey, subKey, System.currentTimeMillis());
+    }
+
+    /** Restore keys together with the time they were fetched. */
+    public void setKeys(String imgKey, String subKey, long fetchedAt) {
         if (imgKey == null || subKey == null) return;
         this.rawKey = imgKey + subKey;
-        this.keyAt = System.currentTimeMillis();
+        this.keyAt = fetchedAt;
     }
 
     public boolean stale() {

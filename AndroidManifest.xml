@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.volcano.bmusic"
-    android:versionCode="25"
-    android:versionName="1.0.24">
+    android:versionCode="30"
+    android:versionName="1.0.29">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -16,6 +16,15 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+
+    <!-- Android 11+ package visibility: needed to hand the auth URL to the Bilibili app -->
+    <queries>
+        <package android:name="tv.danmaku.bili" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="bilibili" />
+        </intent>
+    </queries>
 
     <application
         android:name=".App"
@@ -83,6 +92,12 @@
             android:exported="false"
             android:resizeableActivity="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden|fontScale|uiMode" />
+
+        <activity
+            android:name=".ui.BiliAccountActivity"
+            android:exported="false"
+            android:resizeableActivity="true"
+            android:configChanges="keyboardHidden|uiMode" />
 
         <activity
             android:name=".ui.UpdateActivity"

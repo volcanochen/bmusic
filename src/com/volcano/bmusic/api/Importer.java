@@ -9,6 +9,7 @@ import com.volcano.bmusic.App;
 import com.volcano.bmusic.db.Db;
 import com.volcano.bmusic.model.Track;
 import com.volcano.bmusic.util.MetaResolver;
+import com.volcano.bmusic.util.TrackKey;
 
 import org.json.JSONObject;
 
@@ -36,7 +37,12 @@ public final class Importer {
     }
 
     public interface Callback {
-        void done(List<Track> added, String failMsg);
+        /**
+         * @param added    本次真正新入库的曲目
+         * @param existing 链接已在曲库、本次跳过（保留原缓存/播放次数）的曲目
+         * @param failMsg  解析错误信息，可能为 null
+         */
+        void done(List<Track> added, List<Track> existing, String failMsg);
     }
 
     /**
@@ -59,9 +65,12 @@ public final class Importer {
             @Override
             public void run() {
                 final List<Track> added = new ArrayList<Track>();
+                final List<Track> existing = new ArrayList<Track>();
                 String fail = null;
+                Db db = Db.get(c);
                 try {
                     List<Bili.Ref> refs = Bili.extractAll(text);
+                    // 同一段文字里出现多个等价链接时，也按规范化链接去重
                     Set<String> seen = new HashSet<String>();
                     if (refs.isEmpty()) {
                         try {
@@ -90,12 +99,19 @@ public final class Importer {
                                 try {
                                     Track t = Bili.fetch(tr, data);
                                     if (t == null || TextUtils.isEmpty(t.id)) continue;
-                                    if (seen.contains(t.id)) continue;
-                                    seen.add(t.id);
+                                    String link = TrackKey.of(t);
+                                    if (link == null || !seen.add(link)) continue;
+                                    // 不管是手动添加还是从收藏夹导入，只要链接已在曲库就跳过，
+                                    // 绝不覆盖已有的缓存路径与播放次数。
+                                    Track old = db.findByLink(link);
+                                    if (old != null) {
+                                        existing.add(old);
+                                        continue;
+                                    }
                                     t.added = System.currentTimeMillis();
                                     // 先本地规则秒出歌名/歌手/专辑，再排队联网校准
                                     MetaResolver.parseLocal(t);
-                                    Db.get(c).upsert(t);
+                                    db.upsert(t);
                                     added.add(t);
                                     MetaResolver.enqueue(c, t);
                                 } catch (Exception e) {
@@ -118,7 +134,7 @@ public final class Importer {
                     App.runOnUi(new Runnable() {
                         @Override
                         public void run() {
-                            cb.done(added, f);
+                            cb.done(added, existing, f);
                         }
                     });
                 }
@@ -147,11 +163,16 @@ public final class Importer {
         return n;
     }
 
-    public static void toastResult(Context c, List<Track> added, String fail) {
+    public static void toastResult(Context c, List<Track> added,
+                                   List<Track> existing, String fail) {
         StringBuilder sb = new StringBuilder();
         if (!added.isEmpty()) {
-            sb.append("已添加 ").append(added.size()).append(" 首：").append(added.get(0).title);
+            sb.append("已添加 ").append(added.size()).append(" 首：").append(added.get(0).displayTitle());
             if (added.size() > 1) sb.append(" 等");
+        }
+        if (existing != null && !existing.isEmpty()) {
+            if (sb.length() > 0) sb.append("\n");
+            sb.append("已在曲库 ").append(existing.size()).append(" 首，重复链接已跳过");
         }
         if (fail != null && !fail.isEmpty()) {
             if (sb.length() > 0) sb.append("\n");

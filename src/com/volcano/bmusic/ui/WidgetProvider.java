@@ -15,8 +15,9 @@ import com.volcano.bmusic.model.Track;
 import com.volcano.bmusic.player.PlaybackService;
 
 /**
- * 2x2 桌面小组件：播放/暂停圆钮 + 歌名/歌手两行信息。
- * 点圆钮切换播放/暂停；点其他空间（按钮与文字外）进入播放页。
+ * 2x2 桌面小组件：左「上一首」/ 中「播放暂停」/ 右「下一首」+ 歌名/歌手两行信息。
+ * 左右两个控件用 weight 撑满剩余宽度，形成大点击热区（AppWidget 的 RemoteViews
+ * 不支持触摸手势，左右滑动由点击左右热区替代）；点文字或空白处进入播放页。
  * 图标与文字由服务的 ACT_STATE 广播实时同步；文字按长度分档缩放，
  * 保证每行至少 8 个字不出现省略号。
  */
@@ -28,15 +29,32 @@ public class WidgetProvider extends AppWidgetProvider {
         return f;
     }
 
-    private static PendingIntent togglePi(Context c) {
+    /**
+     * 把桌面点击转成服务命令。O+ 必须走前台服务启动，否则桌面点击会被系统拦截
+     * （Background start not allowed）；O- 无此限制，用普通 getService。
+     * 每个 action 用不同 requestCode，避免 PendingIntent.FLAG_UPDATE_CURRENT 互相覆盖。
+     */
+    private static PendingIntent actionPi(Context c, String action, int code, boolean forcePrev) {
         Intent i = new Intent(c, PlaybackService.class);
-        i.setAction(PlaybackService.A_TOGGLE);
-        // O+ 必须走前台服务启动，否则桌面点击会被系统拦截
-        //（Background start not allowed）；O- 无此限制，用普通 getService。
+        i.setAction(action);
+        if (forcePrev) i.putExtra("force", true);
         if (Build.VERSION.SDK_INT >= 26) {
-            return PendingIntent.getForegroundService(c, 11, i, piFlags());
+            return PendingIntent.getForegroundService(c, code, i, piFlags());
         }
-        return PendingIntent.getService(c, 11, i, piFlags());
+        return PendingIntent.getService(c, code, i, piFlags());
+    }
+
+    private static PendingIntent togglePi(Context c) {
+        return actionPi(c, PlaybackService.A_TOGGLE, 11, false);
+    }
+
+    private static PendingIntent prevPi(Context c) {
+        // 小组件上点「上一首」应当真的切歌，而不是像通知栏那样 >4s 回到开头
+        return actionPi(c, PlaybackService.A_PREV, 13, true);
+    }
+
+    private static PendingIntent nextPi(Context c) {
+        return actionPi(c, PlaybackService.A_NEXT, 14, false);
     }
 
     private static PendingIntent openPi(Context c) {
@@ -55,6 +73,8 @@ public class WidgetProvider extends AppWidgetProvider {
         RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.widget_play);
         rv.setOnClickPendingIntent(R.id.widget_root, openPi(c));
         rv.setOnClickPendingIntent(R.id.widget_toggle, togglePi(c));
+        rv.setOnClickPendingIntent(R.id.widget_prev, prevPi(c));
+        rv.setOnClickPendingIntent(R.id.widget_next, nextPi(c));
         rv.setImageViewResource(R.id.widget_toggle,
                 playing ? R.drawable.ic_pause : R.drawable.ic_play);
         rv.setTextViewText(R.id.widget_title, title);

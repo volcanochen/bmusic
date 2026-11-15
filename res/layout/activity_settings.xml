@@ -66,9 +66,37 @@
             android:layout_marginRight="18dp"
             android:layout_marginTop="8dp"
             android:lineSpacingExtra="4dp"
-            android:text="登录网页版B站后，从浏览器开发者工具里复制 Cookie 粘贴到上面，可解锁更高码率。不填也能正常听。"
+            android:text="也可以直接在下面用 B 站 App 授权登录，登录后会自动填好凭证；手动粘贴的 Cookie 仍然可用。"
             android:textColor="@color/text_dim"
             android:textSize="11sp" />
+
+        <LinearLayout
+            android:id="@+id/btn_bili_account"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginLeft="14dp"
+            android:layout_marginRight="14dp"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/shape_card"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="14dp"
+            android:paddingRight="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="B站账号 · 授权登录 / 收藏夹导入"
+                android:textColor="@color/text"
+                android:textSize="14sp" />
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_next"
+                android:tint="@color/text_dim" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"

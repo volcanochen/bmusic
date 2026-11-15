@@ -12,8 +12,10 @@ import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
@@ -21,7 +23,7 @@ import java.util.zip.GZIPInputStream;
 public final class Http {
 
     public static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            + "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+            + "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
     public static final String REFERER = "https://www.bilibili.com/";
 
     private static volatile boolean ready = false;
@@ -44,10 +46,17 @@ public final class Http {
         public int code;
         public String body;
         public String location;
+        /** lower-case header name -> first value */
         public Map<String, String> headers = new HashMap<String, String>();
+        /** every Set-Cookie line, in order (login needs all of them) */
+        public List<String> cookies = new ArrayList<String>();
 
         public boolean ok() {
             return code >= 200 && code < 300;
+        }
+
+        public String header(String key) {
+            return headers.get(key.toLowerCase(Locale.US));
         }
     }
 
@@ -56,6 +65,24 @@ public final class Http {
         h.put("User-Agent", UA);
         h.put("Referer", REFERER);
         h.put("Accept-Language", "zh-CN,zh;q=0.9");
+        return h;
+    }
+
+    /**
+     * Browser-like headers for bilibili api calls. The B-station risk engine
+     * checks the consistency of UA / sec-ch-ua / Sec-Fetch-*; a bare UA with
+     * none of these is one of the main reasons for -412.
+     */
+    public static Map<String, String> browserHeaders() {
+        Map<String, String> h = baseHeaders();
+        h.put("Accept", "application/json, text/plain, */*");
+        h.put("Origin", "https://www.bilibili.com");
+        h.put("sec-ch-ua", "\"Google Chrome\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"");
+        h.put("sec-ch-ua-mobile", "?0");
+        h.put("sec-ch-ua-platform", "\"Windows\"");
+        h.put("Sec-Fetch-Dest", "empty");
+        h.put("Sec-Fetch-Mode", "cors");
+        h.put("Sec-Fetch-Site", "same-site");
         return h;
     }
 
@@ -69,18 +96,59 @@ public final class Http {
         return doGet(url, headers, true);
     }
 
-    private static Resp doGet(String url, Map<String, String> headers, boolean followRedirect) throws IOException {
+    /** POST a raw body. Used by the login/refresh and web-ticket endpoints. */
+    public static Resp post(String url, Map<String, String> headers, String body, String contentType)
+            throws IOException {
+        init();
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setInstanceFollowRedirects(true);
+        c.setConnectTimeout(15000);
+        c.setReadTimeout(20000);
+        c.setRequestMethod("POST");
+        c.setDoOutput(true);
+        apply(c, headers);
+        if (contentType != null && contentType.length() > 0) {
+            c.setRequestProperty("Content-Type", contentType);
+        }
+        if (body != null && body.length() > 0) {
+            OutputStream os = c.getOutputStream();
+            try {
+                os.write(body.getBytes("UTF-8"));
+            } finally {
+                os.close();
+            }
+        }
+        try {
+            return read(c);
+        } finally {
+            c.disconnect();
+        }
+    }
+
+    private static Resp doGet(String url, Map<String, String> headers, boolean followRedirect)
+            throws IOException {
         init();
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setInstanceFollowRedirects(followRedirect);
         c.setConnectTimeout(15000);
         c.setReadTimeout(20000);
-        c.setRequestProperty("User-Agent", UA);
-        if (headers != null) {
-            for (Map.Entry<String, String> e : headers.entrySet()) {
-                if (e.getValue() != null) c.setRequestProperty(e.getKey(), e.getValue());
-            }
+        apply(c, headers);
+        try {
+            return read(c);
+        } finally {
+            c.disconnect();
         }
+    }
+
+    private static void apply(HttpURLConnection c, Map<String, String> headers) {
+        c.setRequestProperty("User-Agent", UA);
+        if (headers == null) return;
+        for (Map.Entry<String, String> e : headers.entrySet()) {
+            if (e.getValue() != null) c.setRequestProperty(e.getKey(), e.getValue());
+        }
+    }
+
+    private static Resp read(HttpURLConnection c) throws IOException {
         int code = c.getResponseCode();
         Resp r = new Resp();
         r.code = code;
@@ -89,22 +157,20 @@ public final class Http {
         if (raw != null) {
             for (Map.Entry<String, List<String>> e : raw.entrySet()) {
                 if (e.getKey() == null || e.getValue() == null || e.getValue().isEmpty()) continue;
-                r.headers.put(e.getKey().toLowerCase(), e.getValue().get(0));
+                String key = e.getKey().toLowerCase(Locale.US);
+                r.headers.put(key, e.getValue().get(0));
+                if ("set-cookie".equals(key)) r.cookies.addAll(e.getValue());
             }
         }
         String enc = c.getHeaderField("Content-Encoding");
         InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream();
-        if (in == null) {
-            c.disconnect();
-            return r;
-        }
+        if (in == null) return r;
         try {
             InputStream src = ("gzip".equalsIgnoreCase(enc)) ? new GZIPInputStream(in) : in;
             r.body = readAll(src);
         } finally {
             in.close();
         }
-        c.disconnect();
         return r;
     }
 
@@ -127,12 +193,7 @@ public final class Http {
         c.setInstanceFollowRedirects(true);
         c.setConnectTimeout(20000);
         c.setReadTimeout(30000);
-        c.setRequestProperty("User-Agent", UA);
-        if (headers != null) {
-            for (Map.Entry<String, String> e : headers.entrySet()) {
-                if (e.getValue() != null) c.setRequestProperty(e.getKey(), e.getValue());
-            }
-        }
+        apply(c, headers);
         int code = c.getResponseCode();
         if (code >= 400) {
             c.disconnect();

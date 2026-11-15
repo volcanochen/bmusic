@@ -1039,5 +1039,7 @@ public class PlayerActivity extends Activity {
         }, 200);
         handler.removeCallbacks(progressPoller);
         handler.postDelayed(progressPoller, 300);
+        // 从视频 App 切回来时，若上次是被音频焦点打断，从断点续播
+        PlaybackService.resumeIfInterrupted(this);
     }
 }

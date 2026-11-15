@@ -1,4 +1,4 @@
-# BMusic 需求清单与实现对照（v1.0.0 → v1.0.22）
+# BMusic 需求清单与实现对照（v1.0.0 → v1.0.29）
 
 本文档汇总 BMusic 全部需求点，按主题归类。需求来源分两类：
 
@@ -20,8 +20,10 @@
 | E | 歌词 | 5 | v1.0.4 / v1.0.6 / v1.0.8 |
 | F | 音量控制 | 1 | v1.0.4 |
 | G | 离线缓存 | 5 | v1.0.0 / v1.0.3 / v1.0.8 |
-| H | 缺陷修复与工程加固 | 15 | 随版本持续 |
-| I | 桌面小组件与扫码等专项 | 4 | v1.0.9 / v1.0.10 / v1.0.16 |
+| H | 缺陷修复与工程加固 | 18 | 随版本持续（v1.0.25 补 -412 风控、v1.0.26 补中断续播） |
+| I | 桌面小组件与扫码等专项 | 5 | v1.0.9 / v1.0.10 / v1.0.16 / v1.0.26 |
+| J | B 站账号与收藏夹联动 | 5 | v1.0.25 |
+| K | 曲库去重与数据备份 | 2 | v1.0.27 |
 
 ---
 
@@ -121,6 +123,8 @@
 | H14 | 自研跑马灯（scrollX-on-TextView）在三星上把文字搞得完全不绘制：`canvas.translate` / 程序化 padding 两种居中都与 singleLine 渲染路径相互干扰；设备关动画时 `animator_duration_scale=0` 还会把 ValueAnimator 瞬间播完 | 自主 | v1.0.21 | 重写为开源社区验证过的 **HorizontalScrollView 方案**（`ui/MarqueeView`）：HSV 包 wrap_content TextView，短文字 FrameLayout gravity 居中、长文字 Handler+SystemClock 真实时间驱动往复 scrollTo；渲染走滚动容器而非 TextView 内部路径，全机型一致；废弃 `MarqueeTextView` 删除 |
 | H15 | v1.0.21 的 HSV 跑马灯默认消费整个触摸序列，包在列表行里**吞掉行点击/长按**、迷你条标题区点击也失效；另有两处细节：居中只设 `CENTER_VERTICAL` 水平实际靠左、滚动终点重复叠加 padding 导致到头多滚 | 自主 | v1.0.22 | `MarqueeView.onTouchEvent` 返回 false 把触摸还给外层（播放页按钮内层 TextView `clickable=true` 不受影响）；居中改 `Gravity.CENTER`；`maxScroll` 直接用 `t.getWidth()`（已含 padding）；按钮左右留白 8dp→14dp |
 | H16 | 列表标题「有的居中有的左对齐」逐行交替：①行复用时 `startIfNeeded` 跑在新文字布局前，拿回收前旧宽度误判居中/溢出，且防重入守卫（文字相同即跳过）把错误固化；②XML 内层 `layout_gravity="center_vertical"` 水平默认靠左，与 `childGravityStart=false` 的记忆不符，「放得下→居中」被守卫短路从未执行 | 用户 | v1.0.23 | ①评估前比对 `t.getLayout().getText()` 与当前文字，不一致（旧布局残留）延后一轮再评——**判断「布局是否已反映当前文字」必须锚定布局内容而非时序**；②防重入守卫加宽度比较（`t.getWidth()==runningContent`）；③`setChildGravity` 改为直接对比 LayoutParams 实际 gravity，删除 `childGravityStart` 记忆字段 |
+| H17 | 播放/缓存报「请求被拦截(-412)」，错误文本还重复两遍 | 用户 | v1.0.25 | 旧 `Bili.call()` 签名失败后又发一次**无签名**请求且以它的错误为准，Referer 还固定首页、设备指纹只有孤立的 `buvid3`。改为持久化成对 buvid3/buvid4 + `b_nut/buvid_fp/_uuid` + `bili_ticket`、完整浏览器头 + 视频页 Referer、统一 WBI 签名；`-412/-352` 自动刷新会话退避重试；`wbi/playurl → playurl → durl` 三级降级 + `backup_url` 换 CDN；错误提示引导扫码登录 |
+| H18 | 切到其他视频 / App 中断后，回来播放续不上 | 用户 | v1.0.26 | 根因：所有 `AUDIOFOCUS_LOSS*` 都调 `pause()` 而它会 `abandonAudioFocus()`，放弃注册后系统不再回调 `GAIN`，且 GAIN 分支为空。改为拆分 `pause()` / `pauseForFocus()` → `pauseInternal(userInitiated)`：被动中断保留焦点注册并记 `resumeOnFocusGain`，GAIN 时自动 `play()` 断点续播；`CAN_DUCK` 降音量；API 26+ `AudioFocusRequest` + `setAcceptsDelayedFocusGain(true)`，焦点被占时挂起 `pendingFocusAction` 等 GAIN；每 5s 落盘 `last_pos/last_pos_id`，服务重建后 `restore()`→`pendingSeek`→`onPrepared.seekTo`；两个 Activity 的 `onResume` 用 `A_RESUME` 兜底（用户主动暂停过或服务未启动都不自动出声） |
 
 ### I. 桌面小组件与扫码
 
@@ -130,6 +134,26 @@
 | W2 | 小组件图标实时反映播放状态 | 自主 | v1.0.9 | 服务 `ACT_STATE` 广播（包内显式）加入 WidgetProvider intent-filter，onReceive 里 refreshAll；`onUpdate` 初始渲染按 `PlaybackService.get().isPlaying()` 取图标（服务未运行显示播放键） |
 | W3 | 扫码添加（摄像头扫码 + 相册图片识别，离线） | 用户 | v1.0.9 / v1.0.16 | `ui/ScanActivity` 相机逐帧解码 + `decodeImageUri` 四向旋转重试；v1.0.16 起解码内核换 vendored ZXing（见 H13） |
 | W4 | 折叠屏 / 大屏自适应作为宣传点并补实拍图 | 用户 | v1.0.21 | OPPO N6 近方屏实测：曲库自动重排、播放页自动切「封面左 · 控制右」双栏（`Win.wide()` 选 land 布局）；`docs/screenshots/fold-*.png` 实拍图入 README |
+| W5 | 桌面组件增加下一首 / 上一首，点击左右滑动切歌 | 用户 | v1.0.26 | `layout/widget_play.xml` 改为 `widget_prev` / `widget_toggle` / `widget_next` 三键横排，左右 `layout_weight=1` 撑满成大点击热区 + `drawable/widget_side_btn.xml`；`WidgetProvider` 三个不同 requestCode（11/13/14）的 `getForegroundService` PendingIntent 分别绑 `A_TOGGLE/A_PREV(force=true)/A_NEXT`，`widget_root` 仍打开播放页；`RemoteViews` 不支持触摸手势（左右滑动会被桌面当翻页），故用点击左右热区替代；`A_PREV` 带 `force` 时无条件切歌，不套用「播放 >4s 回到开头」。v1.0.28 曾把热区扩大到全高左右各 45%，v1.0.29 按用户要求回退 |
+
+### J. B 站账号与收藏夹联动
+
+| ID | 需求 | 来源 | 版本 | 实现方式 |
+| :-- | :-- | :-- | :-- | :-- |
+| J1 | 增加和 B 站账号的联动：通过 B 站 App 授权登录 | 用户 | v1.0.25 | `ui/BiliAccountActivity` + `api/BiliAuth`：`qrcode/generate` 拿 `url/qrcode_key`，vendored ZXing **编码**子集本地生成二维码（`util/QrEncoder`），2s 轮询 `qrcode/poll`（86101/86090/86038/0），成功后从**全部 Set-Cookie** 收集 `SESSDATA/bili_jct/DedeUserID/...` 存入 `App.setCookie`，`nav` 校验并记住昵称/UID；支持本地退出。`net/Http` 新增 `post()` 与 `Resp.cookies` |
+| J2 | 在 B 站收藏夹里创建/找到名为 bmusic 的收藏夹，歌曲可直接从该收藏导入 | 用户 | v1.0.25 | `api/BiliFav`：`x/v3/fav/folder/created/list-all` 查同名文件夹，没有则 `POST .../folder/add`（`csrf=bili_jct`，公开）创建；`x/v3/fav/resource/list` 分页拉全部视频，逐个 `view` 取 cid 生成 Track 入库（合集 `type=21` 经 `seasons_archives_list` 展开全部成员、多 P 全部分 P 导入，复用一次 `view` 数据；按 `id` 去重跳过已有曲目以保留缓存/播放次数、320ms 间隔防风控），完成后发 `Importer.ACT_ADDED` 刷新曲库 |
+| J3 | 点登录直接跳转打开 B 站 App 授权，不要扫码/第二台设备 | 用户 | v1.0.25 | 官方 OAuth SDK 需开放平台 `client_id/secret` + 应用签名登记（个人开发者不可得，且破坏零依赖），改用等价路径：把二维码授权 `url` 经 `bilibili://forward?-Btarget=<encoded>` 交给 B 站 App 内置 WebView（`MWebActivity`），那里已有登录态，点「确认」即完成，`qrcode/poll` 收尾；`btn_open_app` 主按钮 + `<queries>` 包可见性声明 + 三级兜底（去包名 → 浏览器 → 提示二维码）；`onResume()` 返回时同步 UI。横屏新增 `layout-land` 左右分栏，二维码完整可见 |
+| J4 | 从 B 站账号导入列表也是一个添加音频的方式，放到「+」号里 | 用户 | v1.0.25 | `MainActivity.showAddSourceDialog()` 增加第 5 项 `menu_bili_fav` → 带 `EXTRA_AUTO_IMPORT` 打开 `BiliAccountActivity`；`refresh()` 已登录则直接 `doImport()`，未登录则等授权成功后自动导入；横屏改用 `R.layout.dialog_add_item` 紧凑行高，5 项完整可见 |
+| J5 | 导入时如果收藏的是合集，要把全部都导入 | 用户 | v1.0.25 | `BiliFav`：`type=21` 合集（`id`=season_id、无 bvid）经 `x/polymer/web-space/seasons_archives_list` 分页展开全部成员视频（真实合集 10/10 实测）；多 P 视频由 `pageCount()` + `fetch(ref, data)` 全部分 P 入库，不再只取第 1 P；复用一次 `view` 响应避免重复请求，按 Track id 去重跳过已有曲目 |
+
+---
+
+### K. 曲库去重与数据备份
+
+| ID | 需求 | 来源 | 版本 | 实现方式 |
+| :-- | :-- | :-- | :-- | :-- |
+| K1 | 曲库里有的是导入的、有的是单独添加的，链接一样的重复项要去重 | 用户 | v1.0.27 | `util/TrackKey` 把身份归一为「BV 号 + 分 P」（兼容老备份里只有 BV 号 / av 号 / `page=0` 的 id），`db/Db` 升 `VER=3` 加 `tracks.link` 列 + 唯一索引；`Importer.add` / `BiliFav.importAll` / `Backup.restore` 一律先 `findByLink()` 命中即跳过（不覆盖缓存与播放次数）；`Db.dedup()` 合并历史重复行、迁移歌单与历史引用，在数据库升级、`App.onCreate`、恢复备份后自动执行，「我的」页另有「曲库去重」按钮。多 P 各分 P 链接不同，不误合并 |
+| K2 | 备份数据按曲库的歌曲来备份，不用记录从哪来的 | 用户 | v1.0.27 | `util/Backup.export()` 以 `db.allTracks()` 为事实来源，按 link 去重后输出并把重复行 id 映射到保留行（歌单/历史引用同步改写），JSON 只含歌曲本身 + 歌单 + 最近播放，**不写任何来源 / 导入渠道字段**；`restore()` 按 link 合并、用 `idMap` 修正旧 id 引用，并补回旧版恢复会丢的 `srcTitle/song/artist/album` 元信息 |
 
 ---
 
@@ -196,6 +220,10 @@
 | 58 | 按钮里的跑马字要留出位置：不贴边、更不能超出按钮 | 用户 | v1.0.23 | 六个播放页按钮（竖/横两布局）的左右留白从内层文字移到 MarqueeView 自身 padding（12dp）：MarqueeView `clipToPadding=true`（默认）使滚动中的文字在距药丸边缘 12dp 处被裁切，配合 avail/maxScroll 计算已扣除 padding，静止与滚动全程文字都不触碰按钮边缘。Note8 竖屏 + 2220×1080 模拟横屏双验证（横屏窄按钮滚动中帧确认裁切位置） |
 | 59 | 列表歌曲应靠左对齐（居中只适合播放页） | 用户 | v1.0.24 | MarqueeView 新增 `alignStart` 自定义属性（res/values/attrs.xml declare-styleable）：item_track 的 title_box/sub_box 设 `app:alignStart="true"`，放得下也 START 对齐；播放页不设该属性保持居中。坑：ui 包引用 R 需显式 `import com.volcano.bmusic.R`。Note8 验证列表全部靠左、播放页居中无回归 |
 | 60 | 「已缓存 ✓」按钮出现两层药丸（小药丸叠在大药丸里） | 用户 | v1.0.24 | `updateCacheBtn/resetCacheBtn` 的状态背景（ripple_round / 缓存进度填充 makeCacheBg）此前画在内层 TextView 上——TextView wrap_content 比药丸小且居中偏移，形成两层；v1.0.23 把按钮留白移到容器后更明显。修复：背景统一画到外层 MarqueeView 容器（`btnCache.getParent()`），进度填充恢复整颗药丸。Note8 已缓存状态单层确认 |
+| 61 | 桌面组件增加上一首 / 下一首 | v1.0.26 | 三键横排 + 左右大热区点击切歌（`RemoteViews` 无手势，滑动用点击替代）；v1.0.28 全高热区改动在 v1.0.29 回退 |
+| 62 | 切到其他视频中断后能续回来播放 | v1.0.26 | 被动中断保留音频焦点注册 + GAIN 自动续播 + `last_pos` 断点持久化 + `onResume` 兜底 |
+| 63 | 曲库里导入的和单独添加的，链接一样的重复项要去重 | v1.0.27 | `TrackKey` 规范链接 + `tracks.link` 唯一索引 + 三个入库入口 `findByLink` 跳过 + `Db.dedup()` 合并历史重复行并迁移歌单/历史引用 + 「我的」页手动去重入口 |
+| 64 | 备份按曲库歌曲来备份，不记录从哪来的 | v1.0.27 | `Backup.export` 输出当前曲库快照（去重、无来源字段），`restore` 按链接合并并用 `idMap` 修正旧 id 引用，还原完整元信息 |
 | 54 | 歌曲三点菜单标题栏：最多三行 + 衬线字体与动作区分 | v1.0.20 | `TrackActions.showMenu` 改 `setCustomTitle(view_menu_title)`：TextView `maxLines=3` + `fontFamily=serif` 加粗 16sp，与下方无衬线常规体菜单项明显区分；空标题兜底「未命名曲目」 |
 
 ---
@@ -220,8 +248,17 @@
 - v1.0.22 在 Note8 / N6 验证（跑马灯细节修正）：①播放页六个跑马灯按钮文字与药丸边缘留白 14dp、短文字水平垂直居中（修复 gravity 只设垂直导致水平靠左）；②滚动终点距离不再重复叠加 padding（`TextView.getWidth()` 已含 padding），到头不多滚；③MarqueeView 不再消费触摸事件（`onTouchEvent=false`），列表行点击/长按与迷你条标题区点击恢复；④Note8 全链路回归：启动无 crash（此前 Note8 上的 InflateException 崩溃为开发中间版本所致，非发布版）、播放页竖屏布局正常打开、「缓存到本地」超宽按钮滚动中帧截图确认；⑤README 六张常规截图在 Note8 新分辨率（1080×2220@480dpi）全部重拍（曲库/播放页/歌单/歌单详情/通知/设置）；
 - v1.0.24 在 Note8 验证（列表左对齐 + 缓存按钮双层药丸修复）：曲库列表标题/副标题全部靠左对齐（含带徽章与正在播放行），超长照旧往复滚动；播放页标题/按钮居中无回归；「已缓存 ✓」恢复单层药丸、无内层小药丸；
 - v1.0.23 在 Note8 验证（居中错乱修复 + 按钮跑马字不贴边）：曲库来回滚动多屏后，所有放得下的标题（含带「·N次」徽章的、正在播放粉色的）全部稳定居中；超长标题（如「梁静茹 / 艾怡良 - 飘洋过海来看你」）正确左对齐进入往复滚动；副标题滚动正常；播放页六个按钮留白移至容器 padding（12dp），竖屏与 2220×1080 模拟横屏下滚动中帧均确认文字在距药丸边缘 12dp 处裁切、不贴边不出界；迷你条点击进播放页、播放页标题/按钮居中无回归；
-- 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）；uiautomator dump 在有跑马灯动画的页面因永不满闲而失败（用 screencap + Read 验证）。
+- v1.0.25 在 Note8（1080×2220）验证：①覆盖安装 v1.0.25 无 crash，「我的」页新增入口显示「当前版本 v1.0.25」；②应用内进入「B站账号」页，二维码成功渲染、提示「打开 B 站 App → 扫一扫」；③把真机截图裁出二维码用 ZXing 解码器反解，得到 `https://account.bilibili.com/h5/account-h5/auth/scan-web?...qrcode_key=...`，`BILI_AUTH_URL=true`；④JVM 编解码回环 Version 8 / 49×49 完全一致；⑤PC 按新链路实测 `wbi/playurl` 返回 `code 0` + 3 档音轨 + 2 条 backup URL，`fnval=0` 兜底也有 durl；⑥测试结束 `am force-stop` 后 `pidof`/`ps -A` 确认无残留进程、无 adb forward、屏幕维持测试前亮屏状态。此处登录后的收藏夹链路当时未验证，后续已在 S22U 真实账号上补验（见下方追加记录）；
+- v1.0.25 在 S22U（SM-S9080，Android 16 / API 36，1544×720 横屏）部署与验证：①首次安装成功、通知权限授予后无 crash；②用户提出「点登录直接跳转 B 站 App 授权」，实测 B 站 App 8.96.0 注册了 `bilibili://forward`（`MWebActivity`）与 `bilibili.oauth`（`AuthLoginActivity`），用 `bilibili://forward?-Btarget=<encoded authUrl>` 可在 B 站 App 内打开「哔哩哔哩扫码登录」确认页并显示已登录账号 VCNC；③实现 `btn_open_app` + `<queries>` 后，从 BMusic 应用内点击按钮成功拉起该确认页（未代替用户点「确认」）；④横屏新增 `layout-land` 左右分栏，二维码四角完整可见（修复此前被屏幕底部截断）；⑤收尾 `am force-stop` 两个包后 `pidof`/`ps -A` 均无残留、无 adb forward、屏幕维持测试前 Awake；设备最终装的是 v1.0.25 且应用未运行；
+- v1.0.25 在 S22U 追加验证（「+」号入口 / 合集全导）：①用户已自行完成 B 站 App 一键授权（页面显示「已登录：VCNC」），此前「登录后链路未验证」的空白已补齐；②点「+」第 5 项直接进入账号页并**自动开始导入**，结果 Toast「共 2 个条目，新增 26 首，已在曲库 2 首；多 P 视频全部分 P 已导入」，无失败；③横屏 5 项菜单原被对话框裁掉半行，改用紧凑行布局后全部完整可见；④紧凑菜单版与最终 UI 修正版均 `build.sh` 通过，release APK 288415 B；
+- v1.0.26 在 S22U 真机验证（用户自行把 BMusic 添加到 Nova 桌面，widgetId 167）：①为添加组件临时关闭 Nova「锁定布局」并固定竖屏，验证结束已恢复为「开」+ `accelerometer_rotation=1 / user_rotation=0`，桌面组件保留；②组件三键完整渲染，点圆钮播放「感情生活 / 凉笑糖」、点右切到「祷告良辰歌」、播放 >5s 后点左无条件切回「感情生活」；③播放中拉起 B 站视频 → 日志 `audioFocus change=-1`、`media_session PLAYING(3)→PAUSED(2)` 且 `position=37783` 保留；④`AUDIOFOCUS_LOSS` 后系统不自动回调 GAIN，切回 BMusic 触发 `bm.a.resume` → `PLAYING(3)`、`position=37816` 断点续播；⑤主动暂停后切回不误播（仍 PAUSED、无 resume 命令）；⑥`am force-stop` 杀服务后重启点播放 `position=79918`，与杀前断点一致；⑦收尾 `am force-stop` 两个包后 `pidof`/`ps -A` 无残留、无服务、无 adb forward、屏幕维持测试前 Awake、顶层为 Nova 桌面未拉回应用；
+- v1.0.26 构建与静态验证：①`bash build.sh` 全流程通过，APK 288493 B ≈ 282 KB，版本号升为 v1.0.26 / versionCode 27；②dex 内含 `AudioFocusRequest` / `bm.a.resume` / `last_pos_id` / 焦点日志字符串，`resources.arsc` 含「上一首 / 下一首」，`res/layout/widget_play.xml` 与 `drawable/widget_side_btn.xml` 已打包；
+- v1.0.27 在 S22U（SM-S9080 / Android 16）验证：①覆盖安装 v1.0.26 → v1.0.27 触发 v2→v3 数据库升级，曲库仍 28 首、id 与全部歌曲字段逐条一致、歌单/历史无悬空引用、无 crash 与 SQLite / 唯一索引报错；②导出备份 `version=2`、`trackCount=28`、无重复链接、曲目 JSON 不含 source/origin/channel 字段；③恢复「3 条同链接不同 id」的构造备份全部跳过，曲库仍 28 首且逐字段不变；④「+」手动输入已在曲库的 BV 号，Toast「已在曲库 1 首，重复链接已跳过」，曲库仍 28 首；⑤「我的」页「曲库去重」按钮正常执行并反馈「曲库没有重复曲目」；
+- v1.0.27 在 Note8（SM-N9500 / Android 9，旧版 v1.0.25、真实曲库 95 首）端到端验证合并逻辑：先用旧版恢复注入 2 条同链接重复行（95→97，列表出现 3 份同链接），再覆盖安装 v1.0.27 → 升级时 `dedupIn` 真实合并 2 行（97→95），重复行消失，原曲目缓存角标与播放次数保留；升级后导出备份 95 首、id 集合与升级前完全一致、无悬空引用；
+- v1.0.27 构建与静态验证：①`TrackKey` JVM 单测 10 例全过；②`bash build.sh` 全流程通过，APK 292589 B ≈ 286 KB，版本号 v1.0.27 / versionCode 28；③`javap` 确认 `Db.better(Track,Track,String)` / `findByLink` / `dedupIn` / `toValues` 已编入 dex；④`build.sh` 末尾新增 `cp` 同步 `release/bmusic.apk`，避免再出现「构建产物已更新但发布包还是旧版」；
+- v1.0.29 回退验证（S22U）：恢复 v1.0.26 三键布局后，点组件顶部左键切歌（「小聪明」→「醒不来」，媒体通知 07→08 同步）、点歌名行左侧打开播放页（`PlayerActivity`），即热区恢复为仅顶部按钮行；
+- 已知不修复项：`am start` 直拉非 exported Activity 被系统拒绝（设计使然，走应用内导航 / 通知栏）；uiautomator dump 在有跑马灯动画或二维码轮询的页面因永不满闲而失败（用 screencap + 像素定位验证）。
 
 ---
 
-<p align="center"><sub>BMusic requirements · 更新于 v1.0.23</sub></p>
+<p align="center"><sub>BMusic requirements · 更新于 v1.0.29</sub></p>
