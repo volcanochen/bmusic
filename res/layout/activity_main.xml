@@ -772,7 +772,7 @@
         <LinearLayout
             android:id="@+id/mini"
             android:layout_width="match_parent"
-            android:layout_height="60dp"
+            android:layout_height="76dp"
             android:background="@drawable/bg_mini"
             android:gravity="center_vertical"
             android:orientation="horizontal"
@@ -781,8 +781,8 @@
 
         <ImageView
             android:id="@+id/mini_art"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
             android:background="@drawable/shape_card2"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_music_note" />

@@ -43,6 +43,22 @@
             android:tint="@color/text_sub"
             android:enabled="false"
             android:alpha="0.35" />
+
+        <Button
+            android:id="@+id/btn_clear_all"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_marginLeft="2dp"
+            android:background="@drawable/ripple_round"
+            android:contentDescription="清空列表"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingLeft="10dp"
+            android:paddingRight="10dp"
+            android:text="清空"
+            android:textAllCaps="false"
+            android:textColor="@color/text_sub"
+            android:textSize="12sp" />
     </LinearLayout>
 
     <!-- 队列多选操作栏（复用曲库逻辑：全选/反选/取消，默认隐藏） -->

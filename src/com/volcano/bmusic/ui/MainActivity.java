@@ -177,7 +177,7 @@ public class MainActivity extends Activity {
         }
         if (mini != null) {
             ViewGroup.LayoutParams lp = mini.getLayoutParams();
-            lp.height = Math.round((compact ? 52 : 60) * d);
+            lp.height = Math.round((compact ? 68 : 76) * d);
             mini.setLayoutParams(lp);
         }
         // The "recent" list has a fixed height; scale it with the window so it

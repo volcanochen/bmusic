@@ -1,6 +1,6 @@
 {
-  "versionCode": 32,
-  "versionName": "1.0.31",
-  "notes": "1.桌面组件播放按钮加大：粉色圆钮从 52dp 增大到 64dp，播放/暂停图标同步放大\n2.组件内容垂直居中：按钮行与歌名/歌手文字整体在组件内居中显示，不再贴顶",
+  "versionCode": 33,
+  "versionName": "1.0.32",
+  "notes": "1.播放列表页右上角新增「清空」按钮：一次清空播放队列，带二次确认，只清队列不删曲库曲目\n2.迷你播放栏封面从 44dp 放大到 64dp，播放栏同步加高到 76dp，与曲库/播放列表条目明显区分",
   "url": "https://raw.githubusercontent.com/volcanochen/bmusic/main/release/bmusic.apk"
 }

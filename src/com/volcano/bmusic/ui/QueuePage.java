@@ -34,6 +34,7 @@ public class QueuePage {
     private boolean selectMode = false;
     private final View btnSelect;
     private final View btnClear;
+    private final View btnClearAll;
     private final View selBar;
     private final TextView tvSel;
 
@@ -47,6 +48,7 @@ public class QueuePage {
         nameView = (TextView) host.findViewById(R.id.name);
         btnSelect = host.findViewById(R.id.btn_select);
         btnClear = host.findViewById(R.id.btn_clear);
+        btnClearAll = host.findViewById(R.id.btn_clear_all);
         selBar = host.findViewById(R.id.queue_sel_bar);
         tvSel = (TextView) host.findViewById(R.id.tv_queue_sel);
 
@@ -72,6 +74,29 @@ public class QueuePage {
             @Override
             public void onClick(View v) {
                 deleteSelected();
+            }
+        });
+        // 头部「清空」：一次清掉整个播放队列（不动曲库），需二次确认
+        btnClearAll.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (data.isEmpty()) {
+                    Toast.makeText(host, "播放列表已经是空的", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                final int n = data.size();
+                new android.app.AlertDialog.Builder(host)
+                        .setMessage("清空播放列表中的 " + n + " 首？\n（只清空队列，不会删除曲库里的曲目）")
+                        .setPositiveButton("清空", new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface d, int w) {
+                                PlaybackService.clearQueue(host);
+                                Toast.makeText(host, "已清空播放列表", Toast.LENGTH_SHORT).show();
+                                setSelectMode(false);
+                                load();
+                            }
+                        })
+                        .setNegativeButton("取消", null).show();
             }
         });
         btnSelect.setOnClickListener(new View.OnClickListener() {
@@ -136,6 +161,7 @@ public class QueuePage {
     }
 
     private void updateSelectionBar() {
+        boolean on = selectMode;
         if (selectMode) {
             tvSel.setText("已选 " + selected.size() + " / " + data.size());
         } else {
@@ -146,6 +172,11 @@ public class QueuePage {
         boolean has = !selected.isEmpty();
         btnClear.setEnabled(has);
         btnClear.setAlpha(has ? 1f : 0.35f);
+        // 「清空」只在普通模式显示；多选模式下由垃圾桶按钮删除所选
+        btnClearAll.setVisibility(on ? View.GONE : View.VISIBLE);
+        boolean any = !data.isEmpty();
+        btnClearAll.setEnabled(any);
+        btnClearAll.setAlpha(any ? 1f : 0.35f);
     }
 
     /** 勾选模式：全选当前队列。 */
